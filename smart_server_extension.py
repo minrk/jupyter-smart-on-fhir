@@ -2,7 +2,6 @@ from jupyter_server.serverapp import ServerApp
 from jupyter_server.base.handlers import JupyterHandler
 import tornado
 import requests
-from dataclasses import dataclass
 import secrets
 from urllib.parse import urlencode, urljoin
 
