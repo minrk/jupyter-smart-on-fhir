@@ -48,6 +48,7 @@ class SmartAuthHandler(JupyterHandler):
     @tornado.web.authenticated
     def get(self):
         fhir_url = self.get_argument("iss")
+        self.settings["launch"] = self.get_argument("launch")
         self.settings["fhir_endpoint"] = fhir_url
         smart_config = fetch_smart_config(fhir_url)
         self.settings["smart_config"] = smart_config
@@ -68,7 +69,11 @@ class SmartAuthHandler(JupyterHandler):
         }
         url = f"{self.settings['fhir_endpoint']}/Observation/9/"
         f = requests.get(url, headers=headers)
-        return f.json()
+        try:
+            return f.json()
+        except requests.exceptions.JSONDecodeError:
+            print(f.text)
+            raise RuntimeError(f.text)
 
 
 class SmartLoginHandler(JupyterHandler):
@@ -95,13 +100,16 @@ class SmartLoginHandler(JupyterHandler):
         headers = {
             "aud": self.settings["fhir_endpoint"],
             "state": state["id"],
+            "launch": self.settings["launch"],
             "redirect_uri": urljoin(self.request.full_url(), callback_path),
             "client_id": "marvin",
             "code_challenge": code_challenge,
             "code_challenge_method": "S256",
             "response_type": "code",
-            "scopes": " ".join(scopes),
+            "scope": " ".join(scopes),
         }
+        print(headers)
+        print(f"{auth_url}?{urlencode(headers)}")
         self.redirect(f"{auth_url}?{urlencode(headers)}")
 
 
