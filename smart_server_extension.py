@@ -4,6 +4,8 @@ import tornado
 import requests
 import secrets
 from urllib.parse import urlencode, urljoin
+import hashlib
+import base64
 
 smart_path = "/extension/smart"
 login_path = "/extension/smart/login"
@@ -87,12 +89,16 @@ class SmartLoginHandler(JupyterHandler):
             "offline_access",
         ]
         auth_url = self.settings["smart_config"]["authorization_endpoint"]
+        self.settings["code_verifier"] = code_verifier = secrets.token_urlsafe(53)
+        code_challenge_b = hashlib.sha256(code_verifier.encode("utf-8")).digest()
+        code_challenge = base64.urlsafe_b64encode(code_challenge_b).rstrip(b"=")
         headers = {
             "aud": self.settings["fhir_endpoint"],
             "state": state["id"],
             "redirect_uri": urljoin(self.request.full_url(), callback_path),
             "client_id": "marvin",
-            "client_secret": "happiness",
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
             "response_type": "code",
             "scopes": " ".join(scopes),
         }
@@ -104,9 +110,9 @@ class SmartCallbackHandler(JupyterHandler):
     def token_for_code(self, code: str):
         data = dict(
             client_id="marvin",
-            client_secret="happiness",
             grant_type="authorization_code",
             code=code,
+            code_verifier=self.settings["code_verifier"],
             redirect_uri=urljoin(self.request.full_url(), callback_path),
         )
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
