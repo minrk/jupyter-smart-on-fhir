@@ -1,0 +1,5 @@
+flask
+jupyterhub
+requests
+oauthenticator
+configurable-http-proxy
