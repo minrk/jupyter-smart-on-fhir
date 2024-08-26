@@ -1,6 +1,7 @@
 # SMART App demo with Jupyter
 
 This is a Jupyter server extension that fetches data from a SMART on FHIR endpoint. 
+
 _work in progress_
 
 # Installation
@@ -79,7 +80,7 @@ _work in progress_
 
 1. Use the sandbox (either [locally](https://github.com/smart-on-fhir/smart-launcher-v2/) or [online](https://launch.smarthealthit.org/)) and point it towards
    ```
-   http://localhost:8888/extension/smart
+   http://localhost:8888/extension/fhir
    ```
 
 
