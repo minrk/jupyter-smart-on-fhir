@@ -1,3 +1,5 @@
 tornado
 requests
 jupyter_server
+authlib
+pyJWT
