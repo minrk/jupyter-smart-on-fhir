@@ -1,22 +1,16 @@
 FROM python:3.12
 
-# Set working directory
 WORKDIR /app
-
-# Copy requirements file
-COPY requirements.txt .
-
-# Install dependencies
+COPY requirements.txt pyproject.toml ./
 RUN pip install --no-cache-dir -r requirements.txt
+COPY fhir.py .
 
-# Copy the rest of the application
-COPY main.py .
-
-# Generate RSA key pair
+# Generate RSA key pair for asymmetric authentication
 RUN openssl genrsa -out jwtRS256.key 2048 && \
     openssl rsa -in jwtRS256.key -pubout -out jwtRS256.key.pub
-
-RUN jupyter server extension enable server_extension.main
+    
+RUN pip install -e .
+RUN jupyter server extension enable fhir
 # Expose the default Jupyter port
 EXPOSE 8888
 
