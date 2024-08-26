@@ -20,7 +20,7 @@ key_id = "somekey"
 
 
 def _jupyter_server_extension_points():
-    return [{"module": "smart_server_extension"}]
+    return [{"module": "fhir"}]
 
 
 def _load_jupyter_server_extension(serverapp: ServerApp):
