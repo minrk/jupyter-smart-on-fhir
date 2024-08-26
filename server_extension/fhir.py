@@ -86,7 +86,7 @@ class SmartAuthHandler(JupyterHandler):
         headers = {
             "Authorization": f"Bearer {token}",
             "Accept": "application/fhir+json",
-            "User-Agent": "JupyterHub",
+            "User-Agent": "Jupyter",
         }
         url = f"{self.settings['fhir_endpoint']}/Condition"  # Endpoint with data
         f = requests.get(url, headers=headers)
