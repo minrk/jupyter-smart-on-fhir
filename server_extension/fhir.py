@@ -98,7 +98,6 @@ class SmartLoginHandler(JupyterHandler):
             "launch": self.settings["launch"],
             "redirect_uri": urljoin(self.request.full_url(), callback_path),
             "client_id": "marvin",
-            "client_secret": "secret",
             "code_challenge": code_challenge,
             "code_challenge_method": "S256",
             "response_type": "code",
@@ -112,7 +111,6 @@ class SmartCallbackHandler(JupyterHandler):
     def token_for_code(self, code: str):
         data = dict(
             client_id="marvin",
-            client_secret="secret",
             grant_type="authorization_code",
             code=code,
             code_verifier=self.settings["code_verifier"],
