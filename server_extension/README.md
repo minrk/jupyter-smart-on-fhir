@@ -30,12 +30,6 @@ _work in progress_
    pip install -e .
    ```
 
-5. Generate a public/private key pair
-   ```
-   openssl genrsa -out jwtRS256.key 2048
-   openssl rsa -in jwtRS256.key -pubout -out jwtRS256.key.pub
-   ```
-
 ## Installation with Docker
 
 1. Clone the repository:

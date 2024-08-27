@@ -5,10 +5,6 @@ COPY requirements.txt pyproject.toml ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY fhir.py .
 
-# Generate RSA key pair for asymmetric authentication
-RUN openssl genrsa -out jwtRS256.key 2048 && \
-    openssl rsa -in jwtRS256.key -pubout -out jwtRS256.key.pub
-    
 RUN pip install -e .
 RUN jupyter server extension enable fhir
 # Expose the default Jupyter port

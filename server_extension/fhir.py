@@ -1,23 +1,15 @@
 from jupyter_server.serverapp import ServerApp
 from jupyter_server.base.handlers import JupyterHandler
 import tornado
-import json
 import requests
 import secrets
 from urllib.parse import urlencode, urljoin
 import hashlib
 import base64
-from authlib.jose import jwk
-import time
-import jwt
 
 smart_path = "/extension/smart"
 login_path = "/extension/smart/login"
 callback_path = "/extension/smart/oauth_callback"
-
-key_file = "jwtRS256.key"
-key_id = "somekey"
-
 
 def _jupyter_server_extension_points():
     return [{"module": "fhir"}]
@@ -29,20 +21,6 @@ def _load_jupyter_server_extension(serverapp: ServerApp):
         (login_path, SmartLoginHandler),
         (callback_path, SmartCallbackHandler),
     ]
-    # First generate a RSA key pair and extract the public key
-    # openssl genrsa -out jwtRS256.key 2048
-    # openssl rsa -in jwtRS256.key -pubout -out jwtRS256.key.pub
-    # Load the RSA public key
-    with open(key_file + ".pub", "rb") as f:
-        pem_public_key = f.read()
-
-    # Create JWKS and store in SMART-compliant format
-    jwks = jwk.dumps(pem_public_key, kty="RSA")
-    jwks["kid"] = key_id
-    jwks["alg"] = "RS256"
-    jwks_compliant = {"keys": [jwks]}
-    print(json.dumps(jwks_compliant, indent=2))
-
     serverapp.web_app.add_handlers(".*$", handlers)
 
 
@@ -120,6 +98,7 @@ class SmartLoginHandler(JupyterHandler):
             "launch": self.settings["launch"],
             "redirect_uri": urljoin(self.request.full_url(), callback_path),
             "client_id": "marvin",
+            "client_secret": "secret",
             "code_challenge": code_challenge,
             "code_challenge_method": "S256",
             "response_type": "code",
@@ -129,35 +108,20 @@ class SmartLoginHandler(JupyterHandler):
 
 
 class SmartCallbackHandler(JupyterHandler):
-    def generate_jwt(self):
-        jwt_dict = {
-            "iss": "marvin",
-            "sub": "marvin",
-            "aud": self.settings["smart_config"]["token_endpoint"],
-            "jti": "someid",
-            "exp": int(time.time() + 3600),
-        }
-        headers = {"kid": key_id}
-        with open(key_file, "rb") as f:
-            private_key = f.read()
-        return jwt.encode(jwt_dict, private_key, "RS256", headers)
 
     def token_for_code(self, code: str):
         data = dict(
             client_id="marvin",
+            client_secret="secret",
             grant_type="authorization_code",
             code=code,
             code_verifier=self.settings["code_verifier"],
             redirect_uri=urljoin(self.request.full_url(), callback_path),
-            client_assertion_type="urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
-            client_assertion=self.generate_jwt(),
         )
-        # print(data['client_assertion'])
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         token_reply = requests.post(
             self.settings["smart_config"]["token_endpoint"], data=data, headers=headers
         )
-        print(token_reply.json())
         return token_reply.json()["access_token"]
 
     @tornado.web.authenticated
