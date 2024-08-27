@@ -5,6 +5,8 @@ smart service authentication for a FHIR endpoint with the Hub
 """
 
 import os
+import time
+import subprocess
 import json
 import secrets
 from functools import wraps
@@ -13,6 +15,8 @@ from jupyterhub.services.auth import HubOAuth
 from dataclasses import dataclass
 import requests
 from urllib.parse import urlencode
+import jwt
+from authlib.jose import jwk
 
 prefix = os.environ.get("JUPYTERHUB_SERVICE_PREFIX", "/")
 auth = HubOAuth(api_token=os.environ["JUPYTERHUB_API_TOKEN"], cache_max_age=60)
@@ -29,7 +33,6 @@ class SMARTConfig:
     fhir_url: str
     token_url: str
     client_id: str
-    client_secret: str
     auth_url: str
     scopes: list[str]
 
@@ -39,6 +42,49 @@ class OAuthState:
     state_id: str
     extra_state: dict[str]
     code: str | None = None
+
+
+def get_jwks(key_file: str = "jwtRS256.key", key_id: str = "1") -> str:
+    try:
+        with open(key_file + ".pub", "rb") as f:
+            pem_public_key = f.read()
+    except FileNotFoundError:
+        print(f"Public key file {key_file}.pub not found. Generating new key pair")
+
+        # Generate new RSA key pair using OpenSSL
+        subprocess.call(["openssl", "genrsa", "-out", key_file, "2048"])
+        subprocess.call(
+            ["openssl", "rsa", "-in", key_file, "-pubout", "-out", f"{key_file}.pub"]
+        )
+
+        # Read the newly generated public key
+        with open(key_file + ".pub", "rb") as f:
+            pem_public_key = f.read()
+
+    # Create JWKS and store in SMART-compliant format
+    jwks = jwk.dumps(pem_public_key, kty="RSA")
+    jwks["kid"] = key_id
+    jwks["alg"] = "RS256"
+    jwks_smart = {"keys": [jwks]}
+    jwks_smart_str = json.dumps(jwks_smart, indent=2)
+    # Printing the JWKS to console to include in the SMART-on-FHIR launch
+    print(jwks_smart_str)
+    return jwks_smart_str
+
+
+def generate_jwt(key_file: str = "jwtRS256.key", key_id: str = "1") -> str:
+    config = SMARTConfig(**session.get("smart_config"))
+    jwt_dict = {
+        "iss": config.client_id,
+        "sub": config.client_id,
+        "aud": config.token_url,
+        "jti": "jwt_id",
+        "exp": int(time.time() + 3600),
+    }
+    headers = {"kid": key_id}
+    with open(key_file, "rb") as f:
+        private_key = f.read()
+    return jwt.encode(jwt_dict, private_key, "RS256", headers)
 
 
 def generate_state(next_url=None) -> OAuthState:
@@ -55,10 +101,11 @@ def token_for_code(code: str):
     config = SMARTConfig(**session.get("smart_config"))
     data = dict(
         client_id=config.client_id,
-        client_secret=config.client_secret,
         grant_type="authorization_code",
         code=code,
         redirect_uri=config.base_url + "oauth_callback",
+        client_assertion_type="urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+        client_assertion=generate_jwt(),
     )
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     token_reply = requests.post(config.token_url, data=data, headers=headers)
@@ -73,8 +120,7 @@ def get_smart_config():
         base_url=request.base_url,
         fhir_url=fhir_url,
         auth_url=app_config["authorization_endpoint"],
-        client_id="id",
-        client_secret="secret",
+        client_id="marvin",
         token_url=app_config["token_endpoint"],
         scopes=app_config["scopes_supported"],
     )
@@ -92,6 +138,7 @@ def authenticated(f):
         else:
             # redirect to login url on failed auth
             session["smart_config"] = get_smart_config()
+            get_jwks()
             state = generate_state(next_url=request.path)
             from_redirect = make_response(start_oauth_flow(state_id=state.state_id))
             from_redirect.set_cookie(
@@ -113,7 +160,6 @@ def start_oauth_flow(state_id: str, scopes: list[str] | None = None):
         "redirect_uri": redirect_uri,
         "launch": request.args.get("launch"),
         "client_id": config.client_id,
-        "client_secret": config.client_secret,
         "response_type": "code",
         "scopes": " ".join(scopes),
     }

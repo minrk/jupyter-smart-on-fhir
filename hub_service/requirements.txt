@@ -3,3 +3,5 @@ jupyterhub
 requests
 oauthenticator
 configurable-http-proxy
+authlib
+pyJWT
