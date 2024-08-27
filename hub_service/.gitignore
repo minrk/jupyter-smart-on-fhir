@@ -1,2 +1,4 @@
 jupyterhub-proxy.pid
 jupyterhub_cookie_secret
+*.key
+*.key.pub
