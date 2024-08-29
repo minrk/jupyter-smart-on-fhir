@@ -15,7 +15,7 @@ from jupyterhub.services.auth import HubOAuth
 import requests
 from urllib.parse import urlencode
 import jwt
-from common.config import SMART, generate_state
+from common.config import SMARTConfig, generate_state
 
 prefix = os.environ.get("JUPYTERHUB_SERVICE_PREFIX", "/")
 auth = HubOAuth(api_token=os.environ["JUPYTERHUB_API_TOKEN"], cache_max_age=60)
@@ -71,10 +71,10 @@ get_jwks()
 
 
 def generate_jwt(key_file: str = "jwtRS256.key", key_id: str = "1") -> str:
-    config = SMART(**session.get("smart_config"))
+    config = SMARTConfig(**session.get("smart_config"))
     jwt_dict = {
-        "iss": config.client_id,
-        "sub": config.client_id,
+        "iss": "client",
+        "sub": "client",
         "aud": config.token_url,
         "jti": "jwt_id",
         "exp": int(time.time() + 3600),
@@ -86,9 +86,9 @@ def generate_jwt(key_file: str = "jwtRS256.key", key_id: str = "1") -> str:
 
 
 def token_for_code(code: str):
-    config = SMART(**session.get("smart_config"))
+    config = SMARTConfig(**session.get("smart_config"))
     data = dict(
-        client_id=config.client_id,
+        client_id="marvin",
         grant_type="authorization_code",
         code=code,
         redirect_uri=config.base_url + "oauth_callback",
@@ -105,12 +105,12 @@ def authenticated(f):
 
     @wraps(f)
     def decorated(*args, **kwargs):
-        if token := session.get("token"):
+        if token := request.cookies.get("token"):
             return f(token, *args, **kwargs)
 
         else:
             # redirect to login url on failed auth
-            session["smart_config"] = SMART.from_url(
+            session["smart_config"] = SMARTConfig.from_url(
                 request.args.get("iss"), request.base_url
             )
             state = generate_state(next_url=request.path)
@@ -133,7 +133,7 @@ def start_oauth_flow(state_id: str, scopes: list[str] | None = None):
         "state": state_id,
         "redirect_uri": redirect_uri,
         "launch": request.args.get("launch"),
-        "client_id": config.client_id,
+        "client_id": "marvin",
         "response_type": "code",
         "scopes": " ".join(scopes),
     }
@@ -150,7 +150,7 @@ def fetch_data(token: str):
         "Accept": "application/fhir+json",
         "User-Agent": "JupyterHub",
     }
-    url = f"{SMART(**session['smart_config']).fhir_url}/Condition"  # Endpoint with data
+    url = f"{SMARTConfig(**session['smart_config']).fhir_url}/Condition"  # Endpoint with data
     f = requests.get(url, headers=headers)
     return Response(f.text, mimetype="application/json")
 
@@ -171,7 +171,7 @@ def callback():
     arg_state = request.args.get("state", None)
     if arg_state != state_id:
         return Response("OAuth state does not match. Try logging in again.", status=403)
-
     token = token_for_code(code)
-    session["token"] = token
-    return make_response(redirect(next_url))
+    to_next_url = make_response(redirect(next_url))
+    to_next_url.set_cookie("smart_token", token, secure=True, httponly=True)
+    return to_next_url
