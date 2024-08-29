@@ -1,0 +1,8 @@
+flask
+tornado
+pyJWT
+requests
+jupyter_server
+jupyterhub
+oauthenticator
+configurable-http-proxy
