@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-smart service authentication for a FHIR endpoint with the Hub
+SMART service authentication for a FHIR endpoint with the Hub
 - Asymmetric authentication
 """
 
@@ -16,7 +16,7 @@ from dataclasses import dataclass
 import requests
 from urllib.parse import urlencode
 import jwt
-
+from common.config import SMART
 
 prefix = os.environ.get("JUPYTERHUB_SERVICE_PREFIX", "/")
 auth = HubOAuth(api_token=os.environ["JUPYTERHUB_API_TOKEN"], cache_max_age=60)
@@ -24,17 +24,6 @@ app = Flask(__name__)
 # encryption key for session cookies
 app.secret_key = secrets.token_bytes(32)
 smart_broadcast = ".well-known/smart-configuration"
-
-
-@dataclass
-class SMARTConfig:
-    name: str
-    base_url: str
-    fhir_url: str
-    token_url: str
-    client_id: str
-    auth_url: str
-    scopes: list[str]
 
 
 @dataclass
@@ -90,7 +79,7 @@ get_jwks()
 
 
 def generate_jwt(key_file: str = "jwtRS256.key", key_id: str = "1") -> str:
-    config = SMARTConfig(**session.get("smart_config"))
+    config = SMART(**session.get("smart_config"))
     jwt_dict = {
         "iss": config.client_id,
         "sub": config.client_id,
@@ -115,7 +104,7 @@ def generate_state(next_url=None) -> OAuthState:
 
 
 def token_for_code(code: str):
-    config = SMARTConfig(**session.get("smart_config"))
+    config = SMART(**session.get("smart_config"))
     data = dict(
         client_id=config.client_id,
         grant_type="authorization_code",
@@ -129,32 +118,19 @@ def token_for_code(code: str):
     return token_reply.json()["access_token"]
 
 
-def get_smart_config():
-    fhir_url = request.args.get("iss")
-    app_config = requests.get(f"{fhir_url}/{smart_broadcast}").json()
-    smart_config = SMARTConfig(
-        name="FHIR demo",
-        base_url=request.base_url,
-        fhir_url=fhir_url,
-        auth_url=app_config["authorization_endpoint"],
-        client_id="marvin",
-        token_url=app_config["token_endpoint"],
-        scopes=app_config["scopes_supported"],
-    )
-    return smart_config
-
-
 def authenticated(f):
     """Decorator for authenticating with the Hub via OAuth"""
 
     @wraps(f)
     def decorated(*args, **kwargs):
         if token := session.get("token"):
-            return f(token)
+            return f(token, *args, **kwargs)
 
         else:
             # redirect to login url on failed auth
-            session["smart_config"] = get_smart_config()
+            session["smart_config"] = SMART.from_url(
+                request.args.get("iss"), request.base_url
+            )
             state = generate_state(next_url=request.path)
             from_redirect = make_response(start_oauth_flow(state_id=state.state_id))
             from_redirect.set_cookie(
@@ -192,7 +168,7 @@ def fetch_data(token: str):
         "Accept": "application/fhir+json",
         "User-Agent": "JupyterHub",
     }
-    url = f"{SMARTConfig(**session['smart_config']).fhir_url}/Condition"  # Endpoint with data
+    url = f"{SMART(**session['smart_config']).fhir_url}/Condition"  # Endpoint with data
     f = requests.get(url, headers=headers)
     return Response(f.text, mimetype="application/json")
 

@@ -6,6 +6,7 @@ import secrets
 from urllib.parse import urlencode, urljoin
 import hashlib
 import base64
+from common.config import SMART
 
 smart_path = "/extension/smart"
 login_path = "/extension/smart/login"
@@ -25,13 +26,6 @@ def _load_jupyter_server_extension(serverapp: ServerApp):
     serverapp.web_app.add_handlers(".*$", handlers)
 
 
-def fetch_smart_config(url: str) -> dict:
-    """Fetch the smart configuration broadcasted for each FHIR endpoint"""
-    broadcast = ".well-known/smart-configuration"
-    config = requests.get(f"{url}/{broadcast}")
-    return config.json()
-
-
 def generate_state(next_url=None) -> dict:
     state_id = secrets.token_urlsafe(16)
     state = {
@@ -48,7 +42,7 @@ class SmartAuthHandler(JupyterHandler):
     @tornado.web.authenticated
     def get(self):
         fhir_url = self.get_argument("iss")
-        smart_config = fetch_smart_config(fhir_url)
+        smart_config = SMART.from_url(fhir_url, self.request.base_url)
         self.settings["launch"] = self.get_argument("launch")
         self.settings["fhir_endpoint"] = fhir_url
         self.settings["smart_config"] = smart_config
