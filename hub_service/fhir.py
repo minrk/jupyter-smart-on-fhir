@@ -12,11 +12,10 @@ import secrets
 from functools import wraps
 from flask import Flask, Response, make_response, redirect, request, session
 from jupyterhub.services.auth import HubOAuth
-from dataclasses import dataclass
 import requests
 from urllib.parse import urlencode
 import jwt
-from common.config import SMART
+from common.config import SMART, generate_state
 
 prefix = os.environ.get("JUPYTERHUB_SERVICE_PREFIX", "/")
 auth = HubOAuth(api_token=os.environ["JUPYTERHUB_API_TOKEN"], cache_max_age=60)
@@ -24,13 +23,6 @@ app = Flask(__name__)
 # encryption key for session cookies
 app.secret_key = secrets.token_bytes(32)
 smart_broadcast = ".well-known/smart-configuration"
-
-
-@dataclass
-class OAuthState:
-    state_id: str
-    extra_state: dict[str]
-    code: str | None = None
 
 
 def get_jwks(key_file: str = "jwtRS256.key", key_id: str = "1") -> str:
@@ -93,16 +85,6 @@ def generate_jwt(key_file: str = "jwtRS256.key", key_id: str = "1") -> str:
     return jwt.encode(jwt_dict, private_key, "RS256", headers)
 
 
-def generate_state(next_url=None) -> OAuthState:
-    state_id = secrets.token_urlsafe(16)
-    state = {
-        "next_url": next_url,
-        "httponly": True,
-        "max_age": 600,
-    }
-    return OAuthState(state_id, state)
-
-
 def token_for_code(code: str):
     config = SMART(**session.get("smart_config"))
     data = dict(
@@ -132,11 +114,11 @@ def authenticated(f):
                 request.args.get("iss"), request.base_url
             )
             state = generate_state(next_url=request.path)
-            from_redirect = make_response(start_oauth_flow(state_id=state.state_id))
+            from_redirect = make_response(start_oauth_flow(state_id=state["id"]))
             from_redirect.set_cookie(
-                "state_id", state.state_id, secure=True, httponly=True
+                "state_id", state["id"], secure=True, httponly=True
             )
-            from_redirect.set_cookie("next_url", state.extra_state["next_url"])
+            from_redirect.set_cookie("next_url", state["next_url"])
             return from_redirect
 
     return decorated

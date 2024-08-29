@@ -6,7 +6,7 @@ import secrets
 from urllib.parse import urlencode, urljoin
 import hashlib
 import base64
-from common.config import SMART
+from common.config import SMART, generate_state
 
 smart_path = "/extension/smart"
 login_path = "/extension/smart/login"
@@ -24,18 +24,6 @@ def _load_jupyter_server_extension(serverapp: ServerApp):
         (callback_path, SmartCallbackHandler),
     ]
     serverapp.web_app.add_handlers(".*$", handlers)
-
-
-def generate_state(next_url=None) -> dict:
-    state_id = secrets.token_urlsafe(16)
-    state = {
-        "id": state_id,
-        "next_url": next_url,
-        "path": "./cookie",
-        "httponly": True,
-        "max_age": 600,
-    }
-    return state
 
 
 class SmartAuthHandler(JupyterHandler):

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import requests
-
+import secrets
 
 @dataclass
 class SMART:
@@ -25,3 +25,12 @@ class SMART:
             client_id="marvin",
             scopes=app_config["scopes_supported"],
         )
+
+
+def generate_state(next_url=None) -> dict:
+    return {
+        "id": secrets.token_urlsafe(16),
+        "next_url": next_url,
+        "httponly": True,
+        "max_age": 600,
+    }
