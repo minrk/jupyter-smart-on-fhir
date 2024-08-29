@@ -5,3 +5,6 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "jupyter_smart_on_fhir"
 version = "0.1.0"
+
+[tool.setuptools]
+packages = ["hub_service", "server_extension"]
