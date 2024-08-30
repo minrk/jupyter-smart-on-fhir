@@ -6,8 +6,6 @@ SMART service authentication for a FHIR endpoint with the Hub
 
 import os
 import time
-import subprocess
-import json
 import secrets
 from functools import wraps
 from flask import Flask, Response, make_response, redirect, request, session
@@ -22,51 +20,6 @@ auth = HubOAuth(api_token=os.environ["JUPYTERHUB_API_TOKEN"], cache_max_age=60)
 app = Flask(__name__)
 # encryption key for session cookies
 app.secret_key = secrets.token_bytes(32)
-
-
-def get_jwks(key_file: str = "jwtRS256.key", key_id: str = "1") -> str:
-    try:
-        with open(key_file + ".pub", "r") as f:
-            public_key = f.read()
-    except FileNotFoundError:
-        print(f"Public key file {key_file}.pub not found. Generating new key pair")
-
-        # Generate new RSA key pair using OpenSSL
-        subprocess.call(["openssl", "genrsa", "-out", key_file, "2048"])
-        subprocess.call(
-            ["openssl", "rsa", "-in", key_file, "-pubout", "-out", f"{key_file}.pub"]
-        )
-        subprocess.call(
-            [
-                "ssh-keygen",
-                "-t",
-                "rsa",
-                "-b",
-                "4096",
-                "-m",
-                "PEM",
-                "-f",
-                key_file,
-                "-q",
-                "-N",
-                "",
-            ]
-        )
-        with open(key_file + ".pub", "rb") as f:
-            public_key = f.read()
-
-    alg = jwt.get_algorithm_by_name("RS256")
-    key = alg.prepare_key(public_key)
-    jwk = alg.to_jwk(key, as_dict=True)
-    jwk.update({"alg": "RS256", "kid": key_id})
-    jwks_smart = {"keys": [jwk]}
-    jwks_smart_str = json.dumps(jwks_smart, indent=2)
-    # Printing the JWKS to console to include in the SMART-on-FHIR launch
-    print(jwks_smart_str)
-    return jwks_smart_str
-
-
-get_jwks()
 
 
 def generate_jwt(key_file: str = "jwtRS256.key", key_id: str = "1") -> str:
@@ -104,7 +57,7 @@ def authenticated(f):
 
     @wraps(f)
     def decorated(*args, **kwargs):
-        if token := request.cookies.get("token"):
+        if token := request.cookies.get("smart_token"):
             return f(token, *args, **kwargs)
 
         else:
