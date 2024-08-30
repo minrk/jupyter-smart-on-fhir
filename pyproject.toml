@@ -20,4 +20,4 @@ testing = ["pytest"]
 
 
 [tool.setuptools]
-packages = ["hub_service", "server_extension"]
+packages = ["jupyter_smart_on_fhir"]
