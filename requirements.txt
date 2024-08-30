@@ -5,4 +5,3 @@ requests
 jupyter_server
 jupyterhub
 oauthenticator
-configurable-http-proxy
