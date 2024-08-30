@@ -5,6 +5,19 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "jupyter_smart_on_fhir"
 version = "0.1.0"
+dependencies = [
+    "flask",
+    "tornado",
+    "pyJWT",
+    "requests",
+    "jupyter_server",
+    "jupyterhub",
+    "oauthenticator",
+]
+
+[project.optional-dependencies]
+testing = ["pytest"]
+
 
 [tool.setuptools]
 packages = ["hub_service", "server_extension"]
