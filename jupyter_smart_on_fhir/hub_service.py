@@ -15,14 +15,13 @@ from jupyterhub.services.auth import HubOAuth
 import requests
 from urllib.parse import urlencode
 import jwt
-from common.config import SMARTConfig, generate_state
+from jupyter_smart_on_fhir.auth import SMARTConfig, generate_state
 
 prefix = os.environ.get("JUPYTERHUB_SERVICE_PREFIX", "/")
 auth = HubOAuth(api_token=os.environ["JUPYTERHUB_API_TOKEN"], cache_max_age=60)
 app = Flask(__name__)
 # encryption key for session cookies
 app.secret_key = secrets.token_bytes(32)
-smart_broadcast = ".well-known/smart-configuration"
 
 
 def get_jwks(key_file: str = "jwtRS256.key", key_id: str = "1") -> str:

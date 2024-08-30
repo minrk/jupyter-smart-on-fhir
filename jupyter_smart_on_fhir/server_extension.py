@@ -6,7 +6,7 @@ import secrets
 from urllib.parse import urlencode, urljoin
 import hashlib
 import base64
-from common.config import SMARTConfig, generate_state
+from jupyter_smart_on_fhir.auth import SMARTConfig, generate_state
 
 smart_path = "/extension/smart"
 login_path = "/extension/smart/login"
