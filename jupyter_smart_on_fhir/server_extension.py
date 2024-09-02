@@ -11,6 +11,7 @@ smart_path = "/extension/smart"
 login_path = "/extension/smart/login"
 callback_path = "/extension/smart/oauth_callback"
 
+
 def _jupyter_server_extension_points():
     return [{"module": "fhir"}]
 
@@ -107,7 +108,6 @@ class SmartLoginHandler(JupyterHandler):
 
 
 class SmartCallbackHandler(JupyterHandler):
-
     def token_for_code(self, code: str):
         data = dict(
             client_id="marvin",
