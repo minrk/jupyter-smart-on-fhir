@@ -11,7 +11,7 @@ class SMARTConfig:
     fhir_url: str
     token_url: str
     auth_url: str
-    scopes: list[str]  # Todo: move to settings
+    scopes: list[str]
     broadcast_path: str = ".well-known/smart-configuration"
 
     @classmethod

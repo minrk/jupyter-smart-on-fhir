@@ -129,7 +129,8 @@ class SMARTCallbackHandler(JupyterHandler):
             raise tornado.web.HTTPError(
                 400, "Error: no code in response from FHIR server"
             )
-        if self.get_argument("state") != self.get_signed_cookie("state_id"):
+        state_id = self.get_signed_cookie("state_id").decode("utf-8")
+        if self.get_argument("state") != state_id:
             raise tornado.web.HTTPError(
                 400, "Error: state received from FHIR server does not match"
             )

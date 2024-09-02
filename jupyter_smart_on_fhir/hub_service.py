@@ -61,7 +61,6 @@ def authenticated(f):
             return f(token, *args, **kwargs)
 
         else:
-            # redirect to login url on failed auth
             session["smart_config"] = SMARTConfig.from_url(
                 request.args.get("iss"), request.base_url
             )
