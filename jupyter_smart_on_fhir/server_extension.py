@@ -1,5 +1,4 @@
 from jupyter_server.extension.application import ExtensionApp
-from jupyter_server.serverapp import ServerApp
 from jupyter_server.base.handlers import JupyterHandler
 import tornado
 import requests
@@ -80,7 +79,6 @@ class SmartAuthHandler(JupyterHandler):
         try:
             return f.json()
         except requests.exceptions.JSONDecodeError:
-            print(f.text)
             raise RuntimeError(f.text)
 
 
@@ -128,12 +126,12 @@ class SmartCallbackHandler(JupyterHandler):
     @tornado.web.authenticated
     def get(self):
         if "error" in self.request.arguments:
-            print(f"Error: {self.get_argument('error')}")
+            raise tornado.web.HTTPError(400, self.get_argument("error"))
         code = self.get_argument("code")
         if not code:
-            print("Error: no code")
+            raise tornado.web.HTTPError(400, "Error: no code in response from FHIR server")
         if self.get_argument("state") != self.get_signed_cookie("state_id"):
-            print("Error: state does not match")
+            raise tornado.web.HTTPError(400, "Error: state received from FHIR server does not match")
         self.settings["smart_token"] = self.token_for_code(code)
         self.redirect(self.settings["next_url"])
 
