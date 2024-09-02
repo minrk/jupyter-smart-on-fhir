@@ -20,12 +20,7 @@ _work in progress_
    source .venv/bin/activate 
    ```
 
-3. Install the required dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-
-4. Install the Jupyter server extension:
+3. Install the Jupyter server extension:
    ```
    pip install -e .
    ```
@@ -51,7 +46,7 @@ _work in progress_
 
 2. Enable the server extension:
    ```
-   jupyter server extension enable fhir
+   jupyter server extension enable jupyter_smart_on_fhir.server_extension
    ```
 
 2. Start the Jupyter server:
