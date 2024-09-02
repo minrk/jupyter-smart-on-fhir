@@ -4,6 +4,7 @@ import secrets
 import jwt
 import json
 
+
 @dataclass
 class SMARTConfig:
     base_url: str

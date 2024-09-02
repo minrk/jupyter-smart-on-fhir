@@ -3,9 +3,7 @@
 c = get_config()  # noqa
 
 # Enable the SMART server extension
-c.ServerApp.jpserver_extensions = {
-    "jupyter_smart_on_fhir.server_extension": True
-}
+c.ServerApp.jpserver_extensions = {"jupyter_smart_on_fhir.server_extension": True}
 c.ServerApp.ip = "0.0.0.0"
 c.ServerApp.allow_root = True
 
@@ -17,6 +15,6 @@ c.SMARTExtensionApp.scopes = [
     "launch",
     "patient/*.*",
     "additional_scope_1",
-    "additional_scope_2"
+    "additional_scope_2",
 ]
 c.SMARTExtensionApp.client_id = "client_id"

@@ -22,9 +22,6 @@ def _jupyter_server_extension_points():
 
 class SMARTExtensionApp(ExtensionApp):
     name = "fhir"
-    default_url = "/smart"
-    load_other_extensions = True
-    file_url_prefix = "/fhir"
 
     scopes = List(
         Unicode(),
@@ -129,9 +126,13 @@ class SMARTCallbackHandler(JupyterHandler):
             raise tornado.web.HTTPError(400, self.get_argument("error"))
         code = self.get_argument("code")
         if not code:
-            raise tornado.web.HTTPError(400, "Error: no code in response from FHIR server")
+            raise tornado.web.HTTPError(
+                400, "Error: no code in response from FHIR server"
+            )
         if self.get_argument("state") != self.get_signed_cookie("state_id"):
-            raise tornado.web.HTTPError(400, "Error: state received from FHIR server does not match")
+            raise tornado.web.HTTPError(
+                400, "Error: state received from FHIR server does not match"
+            )
         self.settings["smart_token"] = self.token_for_code(code)
         self.redirect(self.settings["next_url"])
 
