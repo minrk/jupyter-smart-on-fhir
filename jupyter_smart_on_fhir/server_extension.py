@@ -43,14 +43,14 @@ class SMARTExtensionApp(ExtensionApp):
     def initialize_handlers(self):
         self.handlers.extend(
             [
-                (smart_path, SmartAuthHandler),
-                (login_path, SmartLoginHandler),
-                (callback_path, SmartCallbackHandler),
+                (smart_path, SMARTAuthHandler),
+                (login_path, SMARTLoginHandler),
+                (callback_path, SMARTCallbackHandler),
             ]
         )
 
 
-class SmartAuthHandler(JupyterHandler):
+class SMARTAuthHandler(JupyterHandler):
     @tornado.web.authenticated
     def get(self):
         fhir_url = self.get_argument("iss")
@@ -82,7 +82,7 @@ class SmartAuthHandler(JupyterHandler):
             raise RuntimeError(f.text)
 
 
-class SmartLoginHandler(JupyterHandler):
+class SMARTLoginHandler(JupyterHandler):
     @tornado.web.authenticated
     def get(self):
         state = generate_state()
@@ -108,7 +108,7 @@ class SmartLoginHandler(JupyterHandler):
         self.redirect(f"{auth_url}?{urlencode(headers)}")
 
 
-class SmartCallbackHandler(JupyterHandler):
+class SMARTCallbackHandler(JupyterHandler):
     def token_for_code(self, code: str):
         data = dict(
             client_id=self.settings["client_id"],
