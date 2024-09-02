@@ -1,3 +1,4 @@
+from jupyter_server.extension.application import ExtensionApp
 from jupyter_server.serverapp import ServerApp
 from jupyter_server.base.handlers import JupyterHandler
 import tornado
@@ -8,22 +9,31 @@ import hashlib
 import base64
 from jupyter_smart_on_fhir.auth import SMARTConfig, generate_state
 
-smart_path = "/extension/smart"
-login_path = "/extension/smart/login"
-callback_path = "/extension/smart/oauth_callback"
+smart_path = "/smart"
+login_path = "/smart/login"
+callback_path = "/smart/oauth_callback"
 
 
 def _jupyter_server_extension_points():
-    return [{"module": "jupyter_smart_on_fhir.server_extension"}]
-
-
-def _load_jupyter_server_extension(serverapp: ServerApp):
-    handlers = [
-        (smart_path, SmartAuthHandler),
-        (login_path, SmartLoginHandler),
-        (callback_path, SmartCallbackHandler),
+    return [
+        {"module": "jupyter_smart_on_fhir.server_extension", "app": SmartExtensionApp}
     ]
-    serverapp.web_app.add_handlers(".*$", handlers)
+
+
+class SmartExtensionApp(ExtensionApp):
+    name = "fhir"
+    default_url = "/smart"
+    load_other_extensions = True
+    file_url_prefix = "/fhir"
+
+    def initialize_handlers(self):
+        self.handlers.extend(
+            [
+                (smart_path, SmartAuthHandler),
+                (login_path, SmartLoginHandler),
+                (callback_path, SmartCallbackHandler),
+            ]
+        )
 
 
 class SmartAuthHandler(JupyterHandler):
@@ -48,7 +58,9 @@ class SmartAuthHandler(JupyterHandler):
             "Accept": "application/fhir+json",
             "User-Agent": "Jupyter",
         }
-        url = f"{self.settings["smart_config"].fhir_url}/Condition"  # Endpoint with data
+        url = (
+            f"{self.settings['smart_config'].fhir_url}/Condition"  # Endpoint with data
+        )
         f = requests.get(url, headers=headers)
         try:
             return f.json()
@@ -60,9 +72,8 @@ class SmartAuthHandler(JupyterHandler):
 class SmartLoginHandler(JupyterHandler):
     @tornado.web.authenticated
     def get(self):
-        # Check if referred to from endpoint, otherwise be angry and give up
         state = generate_state()
-        self.set_secure_cookie("state_id", state["id"])  # does this need to be secure?
+        self.set_secure_cookie("state_id", state["id"])
         scopes = [
             "openid",
             "profile",
@@ -116,3 +127,7 @@ class SmartCallbackHandler(JupyterHandler):
             print("Error: state does not match")
         self.settings["smart_token"] = self.token_for_code(code)
         self.redirect(self.settings["next_url"])
+
+
+if __name__ == "__main__":
+    SmartExtensionApp.launch_instance()
