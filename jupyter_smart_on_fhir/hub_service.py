@@ -38,7 +38,8 @@ def generate_jwt() -> str:
 
 
 def token_for_code(code: str):
-    config = SMARTConfig(**session.get("smart_config"))
+    breakpoint()
+    config = session.get("smart_config")
     data = dict(
         client_id=session["client_id"],
         grant_type="authorization_code",
@@ -57,15 +58,17 @@ def authenticated(f):
 
     @wraps(f)
     def decorated(*args, **kwargs):
+        session["client_id"] = os.environ["CLIENT_ID"]
+        session["keys"] = load_keys()
+        session["smart_config"] = SMARTConfig.from_url(
+            request.args.get("iss"),
+            request.base_url,
+            scopes=os.environ.get("SCOPES", "").split(),
+        )
         if token := request.cookies.get("smart_token"):
             return f(token, *args, **kwargs)
 
         else:
-            session["client_id"] = os.environ["CLIENT_ID"]
-            session["keys"] = load_keys()
-            session["smart_config"] = SMARTConfig.from_url(
-                request.args.get("iss"), request.base_url
-            )
             state = generate_state(next_url=request.path)
             from_redirect = make_response(start_oauth_flow(state_id=state["id"]))
             from_redirect.set_cookie(
@@ -80,7 +83,6 @@ def authenticated(f):
 def start_oauth_flow(state_id: str, scopes: list[str] | None = None):
     config = session.get("smart_config")
     redirect_uri = config.base_url + "oauth_callback"
-    config.scopes = os.environ.get("SCOPES", "").split()
     scopes = scopes or config.scopes
     headers = {
         "aud": config.fhir_url,
@@ -104,7 +106,7 @@ def fetch_data(token: str):
         "Accept": "application/fhir+json",
         "User-Agent": "JupyterHub",
     }
-    url = f"{SMARTConfig(**session['smart_config']).fhir_url}/Condition"  # Endpoint with data
+    url = f"{session['smart_config'].fhir_url}/Condition"  # Endpoint with data
     f = requests.get(url, headers=headers)
     return Response(f.text, mimetype="application/json")
 

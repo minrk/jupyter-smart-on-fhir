@@ -18,13 +18,14 @@ class SMARTConfig:
     broadcast_path: str = ".well-known/smart-configuration"
 
     @classmethod
-    def from_url(cls, iss: str, base_url: str):
+    def from_url(cls, iss: str, base_url: str, **kwargs):
         app_config = requests.get(f"{iss}/{cls.broadcast_path}").json()
         return cls(
             base_url=base_url,
             fhir_url=iss,
             token_url=app_config["token_endpoint"],
             auth_url=app_config["authorization_endpoint"],
+            **kwargs,
         )
 
 
@@ -59,7 +60,7 @@ def get_jwks_from_key(key_file: Path, key_id: str = "1") -> str:
 
 def load_keys() -> dict[str, bytes]:
     """Load the private key from environment variables"""
-    key_path = Path(os.environ["SSH_KEY_PATH"], "~/.ssh/id_rsa")
+    key_path = Path(os.environ.get("SSH_KEY_PATH", "~/.ssh/id_rsa"))
     key_id = os.environ.get("SSH_KEY_ID", "1")
     try:
         with open(key_path, "rb") as f:
