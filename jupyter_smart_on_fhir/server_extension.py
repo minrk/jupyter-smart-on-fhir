@@ -6,6 +6,7 @@ import secrets
 from urllib.parse import urlencode, urljoin
 import hashlib
 import base64
+from jupyter_smart_on_fhir.auth import SMARTConfig, generate_state
 
 smart_path = "/extension/smart"
 login_path = "/extension/smart/login"
@@ -13,7 +14,7 @@ callback_path = "/extension/smart/oauth_callback"
 
 
 def _jupyter_server_extension_points():
-    return [{"module": "fhir"}]
+    return [{"module": "jupyter_smart_on_fhir.server_extension"}]
 
 
 def _load_jupyter_server_extension(serverapp: ServerApp):
@@ -25,32 +26,12 @@ def _load_jupyter_server_extension(serverapp: ServerApp):
     serverapp.web_app.add_handlers(".*$", handlers)
 
 
-def fetch_smart_config(url: str) -> dict:
-    """Fetch the smart configuration broadcasted for each FHIR endpoint"""
-    broadcast = ".well-known/smart-configuration"
-    config = requests.get(f"{url}/{broadcast}")
-    return config.json()
-
-
-def generate_state(next_url=None) -> dict:
-    state_id = secrets.token_urlsafe(16)
-    state = {
-        "id": state_id,
-        "next_url": next_url,
-        "path": "./cookie",
-        "httponly": True,
-        "max_age": 600,
-    }
-    return state
-
-
 class SmartAuthHandler(JupyterHandler):
     @tornado.web.authenticated
     def get(self):
         fhir_url = self.get_argument("iss")
-        smart_config = fetch_smart_config(fhir_url)
+        smart_config = SMARTConfig.from_url(fhir_url, self.request.full_url())
         self.settings["launch"] = self.get_argument("launch")
-        self.settings["fhir_endpoint"] = fhir_url
         self.settings["smart_config"] = smart_config
         token = self.settings.get("smart_token")
         if not token:
@@ -67,7 +48,7 @@ class SmartAuthHandler(JupyterHandler):
             "Accept": "application/fhir+json",
             "User-Agent": "Jupyter",
         }
-        url = f"{self.settings['fhir_endpoint']}/Condition"  # Endpoint with data
+        url = f"{self.settings["smart_config"].fhir_url}/Condition"  # Endpoint with data
         f = requests.get(url, headers=headers)
         try:
             return f.json()
@@ -81,7 +62,7 @@ class SmartLoginHandler(JupyterHandler):
     def get(self):
         # Check if referred to from endpoint, otherwise be angry and give up
         state = generate_state()
-        self.set_cookie("state_id", state["id"])  # does this need to be secure?
+        self.set_secure_cookie("state_id", state["id"])  # does this need to be secure?
         scopes = [
             "openid",
             "profile",
@@ -89,12 +70,14 @@ class SmartLoginHandler(JupyterHandler):
             "launch",
             "patient/*.*",
         ]
-        auth_url = self.settings["smart_config"]["authorization_endpoint"]
-        self.settings["code_verifier"] = code_verifier = secrets.token_urlsafe(53)
+        smart_config = self.settings["smart_config"]
+        auth_url = smart_config.auth_url
+        code_verifier = secrets.token_urlsafe(53)
+        self.set_secure_cookie("code_verifier", code_verifier)
         code_challenge_b = hashlib.sha256(code_verifier.encode("utf-8")).digest()
         code_challenge = base64.urlsafe_b64encode(code_challenge_b).rstrip(b"=")
         headers = {
-            "aud": self.settings["fhir_endpoint"],
+            "aud": smart_config.fhir_url,
             "state": state["id"],
             "launch": self.settings["launch"],
             "redirect_uri": urljoin(self.request.full_url(), callback_path),
@@ -113,12 +96,12 @@ class SmartCallbackHandler(JupyterHandler):
             client_id="marvin",
             grant_type="authorization_code",
             code=code,
-            code_verifier=self.settings["code_verifier"],
+            code_verifier=self.get_signed_cookie("code_verifier"),
             redirect_uri=urljoin(self.request.full_url(), callback_path),
         )
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         token_reply = requests.post(
-            self.settings["smart_config"]["token_endpoint"], data=data, headers=headers
+            self.settings["smart_config"].token_url, data=data, headers=headers
         )
         return token_reply.json()["access_token"]
 
@@ -129,7 +112,7 @@ class SmartCallbackHandler(JupyterHandler):
         code = self.get_argument("code")
         if not code:
             print("Error: no code")
-        if self.get_argument("state") != self.get_cookie("state_id"):
+        if self.get_argument("state") != self.get_signed_cookie("state_id"):
             print("Error: state does not match")
         self.settings["smart_token"] = self.token_for_code(code)
         self.redirect(self.settings["next_url"])

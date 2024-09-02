@@ -50,7 +50,7 @@ c.JupyterHub.services = [
         "name": "fhir",
         "url": "http://127.0.0.1:10101",
         "command": ["flask", "run", "--port=10101"],
-        "environment": {"FLASK_APP": "fhir.py"},
+        "environment": {"FLASK_APP": "jupyter_smart_on_fhir/hub_service.py"},
     },
 ]
 c.JupyterHub.load_roles = [

@@ -18,17 +18,14 @@ This project contains a demo of a JupyterHub service that acts as a confidential
 
 3. Install the required dependencies:
    ```
-   pip install -r requirements.txt
+   pip install -e .
    ```
 
 4. Connect to the SMART sandbox (either [locally](https://github.com/smart-on-fhir/smart-launcher-v2/) or [online](https://launch.smarthealthit.org/))
 
-4. Run `jupyter` and go to `localhost:8000` to test the authentication flow, and/or
+5. Run `jupyter` and go to `localhost:8000` to test the authentication flow, and/or
 
-4. Use the sandbox and point it towards
-   ```
-   http://localhost:8000/services/fhir
-   ```
+6. Use the sandbox and point it towards http://localhost:8000/ to test the SMART authentication flow or towards http://localhost:8000/services/fhir to test the SMART on FHIR data fetching workflow.
 
 ## Configuration
 
