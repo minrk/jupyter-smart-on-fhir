@@ -8,6 +8,7 @@ from urllib.parse import urlencode, urljoin
 import hashlib
 import base64
 from jupyter_smart_on_fhir.auth import SMARTConfig, generate_state
+from traitlets import List, Unicode
 
 smart_path = "/smart"
 login_path = "/smart/login"
@@ -25,6 +26,20 @@ class SmartExtensionApp(ExtensionApp):
     default_url = "/smart"
     load_other_extensions = True
     file_url_prefix = "/fhir"
+
+    scopes = List(
+        Unicode(),
+        help="""Scopes to request authorization for at the FHIR endpoint""",
+        default_value=["openid", "profile", "fhirUser", "launch", "patient/*.*"],
+    ).tag(config=True)
+
+    client_id = Unicode(
+        help="""Client ID for the SMART application""", default_value="test-id"
+    ).tag(config=True)
+
+    def initialize_settings(self):
+        self.settings["scopes"] = self.scopes
+        self.settings["client_id"] = self.client_id
 
     def initialize_handlers(self):
         self.handlers.extend(
@@ -74,13 +89,7 @@ class SmartLoginHandler(JupyterHandler):
     def get(self):
         state = generate_state()
         self.set_secure_cookie("state_id", state["id"])
-        scopes = [
-            "openid",
-            "profile",
-            "fhirUser",
-            "launch",
-            "patient/*.*",
-        ]
+        scopes = self.settings["scopes"]
         smart_config = self.settings["smart_config"]
         auth_url = smart_config.auth_url
         code_verifier = secrets.token_urlsafe(53)
@@ -92,7 +101,7 @@ class SmartLoginHandler(JupyterHandler):
             "state": state["id"],
             "launch": self.settings["launch"],
             "redirect_uri": urljoin(self.request.full_url(), callback_path),
-            "client_id": "marvin",
+            "client_id": self.settings["client_id"],
             "code_challenge": code_challenge,
             "code_challenge_method": "S256",
             "response_type": "code",
@@ -104,7 +113,7 @@ class SmartLoginHandler(JupyterHandler):
 class SmartCallbackHandler(JupyterHandler):
     def token_for_code(self, code: str):
         data = dict(
-            client_id="marvin",
+            client_id=self.settings["client_id"],
             grant_type="authorization_code",
             code=code,
             code_verifier=self.get_signed_cookie("code_verifier"),
