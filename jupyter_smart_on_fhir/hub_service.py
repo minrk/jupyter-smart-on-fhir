@@ -13,7 +13,7 @@ from jupyterhub.services.auth import HubOAuth
 import requests
 from urllib.parse import urlencode
 import jwt
-from jupyter_smart_on_fhir.auth import SMARTConfig, generate_state
+from jupyter_smart_on_fhir.auth import SMARTConfig, generate_state, load_keys
 
 prefix = os.environ.get("JUPYTERHUB_SERVICE_PREFIX", "/")
 auth = HubOAuth(api_token=os.environ["JUPYTERHUB_API_TOKEN"], cache_max_age=60)
@@ -22,25 +22,25 @@ app = Flask(__name__)
 app.secret_key = secrets.token_bytes(32)
 
 
-def generate_jwt(key_file: str = "jwtRS256.key", key_id: str = "1") -> str:
+def generate_jwt() -> str:
+    """Generate a JWT for the SMART asymmetric client authentication"""
     config = SMARTConfig(**session.get("smart_config"))
     jwt_dict = {
-        "iss": "client",
+        "iss": session["client_id"],
         "sub": "client",
         "aud": config.token_url,
         "jti": "jwt_id",
         "exp": int(time.time() + 3600),
     }
+    ((key_id, private_key),) = session["keys"].items()
     headers = {"kid": key_id}
-    with open(key_file, "rb") as f:
-        private_key = f.read()
     return jwt.encode(jwt_dict, private_key, "RS256", headers)
 
 
 def token_for_code(code: str):
     config = SMARTConfig(**session.get("smart_config"))
     data = dict(
-        client_id="marvin",
+        client_id=session["client_id"],
         grant_type="authorization_code",
         code=code,
         redirect_uri=config.base_url + "oauth_callback",
@@ -61,6 +61,8 @@ def authenticated(f):
             return f(token, *args, **kwargs)
 
         else:
+            session["client_id"] = os.environ["CLIENT_ID"]
+            session["keys"] = load_keys()
             session["smart_config"] = SMARTConfig.from_url(
                 request.args.get("iss"), request.base_url
             )
@@ -78,13 +80,14 @@ def authenticated(f):
 def start_oauth_flow(state_id: str, scopes: list[str] | None = None):
     config = session.get("smart_config")
     redirect_uri = config.base_url + "oauth_callback"
+    config.scopes = os.environ.get("SCOPES", "").split()
     scopes = scopes or config.scopes
     headers = {
         "aud": config.fhir_url,
         "state": state_id,
         "redirect_uri": redirect_uri,
         "launch": request.args.get("launch"),
-        "client_id": "marvin",
+        "client_id": session["client_id"],
         "response_type": "code",
         "scopes": " ".join(scopes),
     }
