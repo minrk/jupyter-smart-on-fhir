@@ -3,6 +3,9 @@ import requests
 import secrets
 import jwt
 import json
+import os
+import time
+from pathlib import Path
 
 
 @dataclass
@@ -22,7 +25,6 @@ class SMARTConfig:
             fhir_url=iss,
             token_url=app_config["token_endpoint"],
             auth_url=app_config["authorization_endpoint"],
-            scopes=app_config["scopes_supported"],
         )
 
 
@@ -35,18 +37,16 @@ def generate_state(next_url=None) -> dict:
     }
 
 
-def get_jwks_from_key(key_file: str = "jwtRS256.key", key_id: str = "1") -> str:
+def get_jwks_from_key(key_file: Path, key_id: str = "1") -> str:
+    """Generate a JWKS from a public key file. Not required for end users, but useful for development"""
     try:
-        # Todo: move try-except to top level
         with open(key_file + ".pub", "r") as f:
             public_key = f.read()
-    except FileNotFoundError:
-        print(
+    except FileNotFoundError as e:
+        raise FileNotFoundError(
             f"Public key file {key_file}.pub not found. Please generate a new key pair with e.g.\n"
             f"ssh-keygen -t rsa -b 4096 -m PEM -f {key_file} -q -N"
-        )
-        with open(key_file + ".pub", "rb") as f:
-            public_key = f.read()
+        ) from e
 
     alg = jwt.get_algorithm_by_name("RS256")
     key = alg.prepare_key(public_key)
@@ -55,3 +55,18 @@ def get_jwks_from_key(key_file: str = "jwtRS256.key", key_id: str = "1") -> str:
     jwks_smart = {"keys": [jwk]}
     jwks_smart_str = json.dumps(jwks_smart, indent=2)
     return jwks_smart_str
+
+
+def load_keys() -> dict[str, bytes]:
+    """Load the private key from environment variables"""
+    key_path = Path(os.environ["SSH_KEY_PATH"], "~/.ssh/id_rsa")
+    key_id = os.environ.get("SSH_KEY_ID", "1")
+    try:
+        with open(key_path, "rb") as f:
+            private_key = f.read()
+    except FileNotFoundError as e:
+        raise FileNotFoundError(
+            f"Private key file {key_path} not found. Please generate a new key pair with e.g.\n"
+            f"ssh-keygen -t rsa -b 4096 -m PEM -f {key_path} -q -N"
+        ) from e
+    return {key_id: private_key}
