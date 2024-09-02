@@ -1,4 +1,4 @@
-from jupyter_server.serverapp import ServerApp
+from jupyter_server.extension.application import ExtensionApp
 from jupyter_server.base.handlers import JupyterHandler
 import tornado
 import requests
@@ -7,26 +7,47 @@ from urllib.parse import urlencode, urljoin
 import hashlib
 import base64
 from jupyter_smart_on_fhir.auth import SMARTConfig, generate_state
+from traitlets import List, Unicode
 
-smart_path = "/extension/smart"
-login_path = "/extension/smart/login"
-callback_path = "/extension/smart/oauth_callback"
+smart_path = "/smart"
+login_path = "/smart/login"
+callback_path = "/smart/oauth_callback"
 
 
 def _jupyter_server_extension_points():
-    return [{"module": "jupyter_smart_on_fhir.server_extension"}]
-
-
-def _load_jupyter_server_extension(serverapp: ServerApp):
-    handlers = [
-        (smart_path, SmartAuthHandler),
-        (login_path, SmartLoginHandler),
-        (callback_path, SmartCallbackHandler),
+    return [
+        {"module": "jupyter_smart_on_fhir.server_extension", "app": SMARTExtensionApp}
     ]
-    serverapp.web_app.add_handlers(".*$", handlers)
 
 
-class SmartAuthHandler(JupyterHandler):
+class SMARTExtensionApp(ExtensionApp):
+    name = "fhir"
+
+    scopes = List(
+        Unicode(),
+        help="""Scopes to request authorization for at the FHIR endpoint""",
+        default_value=["openid", "profile", "fhirUser", "launch", "patient/*.*"],
+    ).tag(config=True)
+
+    client_id = Unicode(
+        help="""Client ID for the SMART application""", default_value="test-id"
+    ).tag(config=True)
+
+    def initialize_settings(self):
+        self.settings["scopes"] = self.scopes
+        self.settings["client_id"] = self.client_id
+
+    def initialize_handlers(self):
+        self.handlers.extend(
+            [
+                (smart_path, SMARTAuthHandler),
+                (login_path, SMARTLoginHandler),
+                (callback_path, SMARTCallbackHandler),
+            ]
+        )
+
+
+class SMARTAuthHandler(JupyterHandler):
     @tornado.web.authenticated
     def get(self):
         fhir_url = self.get_argument("iss")
@@ -48,28 +69,22 @@ class SmartAuthHandler(JupyterHandler):
             "Accept": "application/fhir+json",
             "User-Agent": "Jupyter",
         }
-        url = f"{self.settings["smart_config"].fhir_url}/Condition"  # Endpoint with data
+        url = (
+            f"{self.settings['smart_config'].fhir_url}/Condition"  # Endpoint with data
+        )
         f = requests.get(url, headers=headers)
         try:
             return f.json()
         except requests.exceptions.JSONDecodeError:
-            print(f.text)
             raise RuntimeError(f.text)
 
 
-class SmartLoginHandler(JupyterHandler):
+class SMARTLoginHandler(JupyterHandler):
     @tornado.web.authenticated
     def get(self):
-        # Check if referred to from endpoint, otherwise be angry and give up
         state = generate_state()
-        self.set_secure_cookie("state_id", state["id"])  # does this need to be secure?
-        scopes = [
-            "openid",
-            "profile",
-            "fhirUser",
-            "launch",
-            "patient/*.*",
-        ]
+        self.set_secure_cookie("state_id", state["id"])
+        scopes = self.settings["scopes"]
         smart_config = self.settings["smart_config"]
         auth_url = smart_config.auth_url
         code_verifier = secrets.token_urlsafe(53)
@@ -81,7 +96,7 @@ class SmartLoginHandler(JupyterHandler):
             "state": state["id"],
             "launch": self.settings["launch"],
             "redirect_uri": urljoin(self.request.full_url(), callback_path),
-            "client_id": "marvin",
+            "client_id": self.settings["client_id"],
             "code_challenge": code_challenge,
             "code_challenge_method": "S256",
             "response_type": "code",
@@ -90,10 +105,10 @@ class SmartLoginHandler(JupyterHandler):
         self.redirect(f"{auth_url}?{urlencode(headers)}")
 
 
-class SmartCallbackHandler(JupyterHandler):
+class SMARTCallbackHandler(JupyterHandler):
     def token_for_code(self, code: str):
         data = dict(
-            client_id="marvin",
+            client_id=self.settings["client_id"],
             grant_type="authorization_code",
             code=code,
             code_verifier=self.get_signed_cookie("code_verifier"),
@@ -108,11 +123,20 @@ class SmartCallbackHandler(JupyterHandler):
     @tornado.web.authenticated
     def get(self):
         if "error" in self.request.arguments:
-            print(f"Error: {self.get_argument('error')}")
+            raise tornado.web.HTTPError(400, self.get_argument("error"))
         code = self.get_argument("code")
         if not code:
-            print("Error: no code")
-        if self.get_argument("state") != self.get_signed_cookie("state_id"):
-            print("Error: state does not match")
+            raise tornado.web.HTTPError(
+                400, "Error: no code in response from FHIR server"
+            )
+        state_id = self.get_signed_cookie("state_id").decode("utf-8")
+        if self.get_argument("state") != state_id:
+            raise tornado.web.HTTPError(
+                400, "Error: state received from FHIR server does not match"
+            )
         self.settings["smart_token"] = self.token_for_code(code)
         self.redirect(self.settings["next_url"])
+
+
+if __name__ == "__main__":
+    SMARTExtensionApp.launch_instance()
