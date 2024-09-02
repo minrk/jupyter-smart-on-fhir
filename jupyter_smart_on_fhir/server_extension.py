@@ -16,11 +16,11 @@ callback_path = "/smart/oauth_callback"
 
 def _jupyter_server_extension_points():
     return [
-        {"module": "jupyter_smart_on_fhir.server_extension", "app": SmartExtensionApp}
+        {"module": "jupyter_smart_on_fhir.server_extension", "app": SMARTExtensionApp}
     ]
 
 
-class SmartExtensionApp(ExtensionApp):
+class SMARTExtensionApp(ExtensionApp):
     name = "fhir"
     default_url = "/smart"
     load_other_extensions = True
@@ -137,4 +137,4 @@ class SmartCallbackHandler(JupyterHandler):
 
 
 if __name__ == "__main__":
-    SmartExtensionApp.launch_instance()
+    SMARTExtensionApp.launch_instance()
