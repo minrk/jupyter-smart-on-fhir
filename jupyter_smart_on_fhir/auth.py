@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 import requests
 import secrets
 import jwt
@@ -10,7 +10,8 @@ from pathlib import Path
 
 @dataclass
 class SMARTConfig:
-    """Configuration to connect to a FHIR endpoint with SMART authorization"""
+    """Client-side session-scoped configuration to connect to a FHIR endpoint with SMART authorization"""
+
     base_url: str
     fhir_url: str
     token_url: str
@@ -28,6 +29,9 @@ class SMARTConfig:
             auth_url=app_config["authorization_endpoint"],
             **kwargs,
         )
+
+    def to_dict(self):
+        return asdict(self)
 
 
 def generate_state(next_url=None) -> dict:
