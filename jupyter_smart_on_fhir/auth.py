@@ -22,12 +22,13 @@ class SMARTConfig:
     @classmethod
     def from_url(cls, iss: str, base_url: str, **kwargs):
         app_config = requests.get(f"{iss}/{cls.broadcast_path}").json()
+        scopes = kwargs.pop("scopes", [])
         return cls(
             base_url=base_url,
             fhir_url=iss,
             token_url=app_config["token_endpoint"],
             auth_url=app_config["authorization_endpoint"],
-            **kwargs,
+            scopes=scopes,
         )
 
     def to_dict(self):
