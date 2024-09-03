@@ -10,6 +10,7 @@ from pathlib import Path
 
 @dataclass
 class SMARTConfig:
+    """Configuration to connect to a FHIR endpoint with SMART authorization"""
     base_url: str
     fhir_url: str
     token_url: str
@@ -30,8 +31,9 @@ class SMARTConfig:
 
 
 def generate_state(next_url=None) -> dict:
+    """Generate a state cookie for OAuth flow"""
     return {
-        "id": secrets.token_urlsafe(16),
+        "state_id": secrets.token_urlsafe(16),
         "next_url": next_url,
         "httponly": True,
         "max_age": 600,
@@ -58,16 +60,22 @@ def get_jwks_from_key(key_file: Path, key_id: str = "1") -> str:
     return jwks_smart_str
 
 
-def load_keys() -> dict[str, bytes]:
+def validate_keys() -> dict[str, bytes]:
     """Load the private key from environment variables"""
     key_path = Path(os.environ.get("SSH_KEY_PATH", "~/.ssh/id_rsa"))
     key_id = os.environ.get("SSH_KEY_ID", "1")
     try:
         with open(key_path, "rb") as f:
             private_key = f.read()
+        jwt.encode({"iss": "test"}, private_key, "RS256")
     except FileNotFoundError as e:
         raise FileNotFoundError(
             f"Private key file {key_path} not found. Please generate a new key pair with e.g.\n"
             f"ssh-keygen -t rsa -b 4096 -m PEM -f {key_path} -q -N"
         ) from e
-    return {key_id: private_key}
+    except jwt.exceptions.InvalidKeyError as e:
+        raise jwt.exceptions.InvalidKeyError(
+            f"Private key file {key_path} is not a valid RSA key. Please generate a new key pair with e.g.\n"
+            f"ssh-keygen -t rsa -b 4096 -m PEM -f {key_path} -q -N"
+        ) from e
+    return {key_id: str(key_path.absolute())}

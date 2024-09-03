@@ -21,8 +21,8 @@ def _jupyter_server_extension_points():
 
 
 class SMARTExtensionApp(ExtensionApp):
+    """Jupyter server extension for SMART on FHIR"""
     name = "fhir"
-
     scopes = List(
         Unicode(),
         help="""Scopes to request authorization for at the FHIR endpoint""",
@@ -48,6 +48,7 @@ class SMARTExtensionApp(ExtensionApp):
 
 
 class SMARTAuthHandler(JupyterHandler):
+    """Handler for SMART on FHIR authentication"""
     @tornado.web.authenticated
     def get(self):
         fhir_url = self.get_argument("iss")
@@ -80,6 +81,7 @@ class SMARTAuthHandler(JupyterHandler):
 
 
 class SMARTLoginHandler(JupyterHandler):
+    """Login handler for SMART on FHIR"""
     @tornado.web.authenticated
     def get(self):
         state = generate_state()
@@ -106,6 +108,7 @@ class SMARTLoginHandler(JupyterHandler):
 
 
 class SMARTCallbackHandler(JupyterHandler):
+    """Callback handler for SMART on FHIR"""
     def token_for_code(self, code: str):
         data = dict(
             client_id=self.settings["client_id"],

@@ -13,7 +13,7 @@ from jupyterhub.services.auth import HubOAuth
 import requests
 from urllib.parse import urlencode
 import jwt
-from jupyter_smart_on_fhir.auth import SMARTConfig, generate_state, load_keys
+from jupyter_smart_on_fhir.auth import SMARTConfig, generate_state, validate_keys
 
 prefix = os.environ.get("JUPYTERHUB_SERVICE_PREFIX", "/")
 auth = HubOAuth(api_token=os.environ["JUPYTERHUB_API_TOKEN"], cache_max_age=60)
@@ -32,13 +32,15 @@ def generate_jwt() -> str:
         "jti": "jwt_id",
         "exp": int(time.time() + 3600),
     }
-    ((key_id, private_key),) = session["keys"].items()
+    ((key_id, private_key_path),) = session["keys"].items()
+    with open(private_key_path, "rb") as f:
+        private_key = f.read()
     headers = {"kid": key_id}
     return jwt.encode(jwt_dict, private_key, "RS256", headers)
 
 
 def token_for_code(code: str):
-    breakpoint()
+    """Exchange an authorization code for an access token"""
     config = session.get("smart_config")
     data = dict(
         client_id=session["client_id"],
@@ -59,7 +61,7 @@ def authenticated(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         session["client_id"] = os.environ["CLIENT_ID"]
-        session["keys"] = load_keys()
+        session["keys"] = validate_keys()
         session["smart_config"] = SMARTConfig.from_url(
             request.args.get("iss"),
             request.base_url,
@@ -70,10 +72,8 @@ def authenticated(f):
 
         else:
             state = generate_state(next_url=request.path)
-            from_redirect = make_response(start_oauth_flow(state_id=state["id"]))
-            from_redirect.set_cookie(
-                "state_id", state["id"], secure=True, httponly=True
-            )
+            from_redirect = make_response(start_oauth_flow(state_id=state["state_id"]))
+            from_redirect.set_cookie(secure=True, httponly=True, **state)
             from_redirect.set_cookie("next_url", state["next_url"])
             return from_redirect
 
@@ -81,6 +81,7 @@ def authenticated(f):
 
 
 def start_oauth_flow(state_id: str, scopes: list[str] | None = None):
+    """Start the OAuth flow by redirecting to the authorization endpoint"""
     config = session.get("smart_config")
     redirect_uri = config.base_url + "oauth_callback"
     scopes = scopes or config.scopes
@@ -101,6 +102,7 @@ def start_oauth_flow(state_id: str, scopes: list[str] | None = None):
 @app.route(prefix)
 @authenticated
 def fetch_data(token: str):
+    """Fetch data from a FHIR endpoint"""
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/fhir+json",
@@ -113,6 +115,7 @@ def fetch_data(token: str):
 
 @app.route(prefix + "oauth_callback")
 def callback():
+    """Callback endpoint to finish OAuth flow"""
     state_id = request.cookies.get("state_id")
     next_url = request.cookies.get("next_url")
 
