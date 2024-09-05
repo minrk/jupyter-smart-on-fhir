@@ -19,6 +19,7 @@ id_scopes = [
     "fhirUser",
 ]
 
+
 # Generic OAuthenticator
 c.JupyterHub.authenticator_class = GenericOAuthenticator
 c.GenericOAuthenticator.oauth_callback_url = "http://localhost:8000/hub/oauth_callback"
@@ -42,15 +43,26 @@ c.GenericOAuthenticator.userdata_from_id_token = True
 # Only one field to derive a name from, and it contains (at least) slashes
 c.GenericOAuthenticator.username_claim = lambda r: r["fhirUser"].replace("/", "_")
 
-
 # Below we set up a service that fetches data from the FHIR server
 # using the same server we used for authentication above
+data_scopes = [
+    "launch",
+    "profile",
+    "patient/*.*",
+]
+scopes_for_service = " ".join(id_scopes + data_scopes)
 c.JupyterHub.services = [
     {
         "name": "fhir",
         "url": "http://127.0.0.1:10101",
         "command": ["flask", "run", "--port=10101"],
-        "environment": {"FLASK_APP": "jupyter_smart_on_fhir/hub_service.py"},
+        "environment": {
+            "FLASK_APP": "jupyter_smart_on_fhir/hub_service.py",
+            "SCOPES": scopes_for_service,
+            "CLIENT_ID": client_id,
+            "SSH_KEY_PATH": "jwtRS256.key",
+            "SSH_KEY_ID": "1",
+        },
     },
 ]
 c.JupyterHub.load_roles = [

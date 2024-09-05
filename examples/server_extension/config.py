@@ -14,7 +14,5 @@ c.SMARTExtensionApp.scopes = [
     "fhirUser",
     "launch",
     "patient/*.*",
-    "additional_scope_1",
-    "additional_scope_2",
 ]
 c.SMARTExtensionApp.client_id = "client_id"

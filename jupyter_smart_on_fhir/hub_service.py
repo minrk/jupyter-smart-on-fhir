@@ -13,43 +13,74 @@ from jupyterhub.services.auth import HubOAuth
 import requests
 from urllib.parse import urlencode
 import jwt
-from jupyter_smart_on_fhir.auth import SMARTConfig, generate_state
+import base64
+from jupyter_smart_on_fhir.auth import SMARTConfig, generate_state, validate_keys
+from cryptography.fernet import Fernet, InvalidToken
 
 prefix = os.environ.get("JUPYTERHUB_SERVICE_PREFIX", "/")
 auth = HubOAuth(api_token=os.environ["JUPYTERHUB_API_TOKEN"], cache_max_age=60)
 app = Flask(__name__)
+
 # encryption key for session cookies
-app.secret_key = secrets.token_bytes(32)
+secret_key = base64.urlsafe_b64encode(secrets.token_bytes(32))
+app.config["fernet"] = Fernet(secret_key)
+# settings passed from the Hub
+app.config["client_id"] = os.environ["CLIENT_ID"]
+app.config["keys"] = validate_keys()
 
 
-def generate_jwt(key_file: str = "jwtRS256.key", key_id: str = "1") -> str:
-    config = SMARTConfig(**session.get("smart_config"))
+def get_encrypted_cookie(key: str) -> str | None:
+    """Fetch and decrypt an encrypted cookie"""
+    cookie = session.get(key)
+    if cookie:
+        try:
+            return app.config["fernet"].decrypt(cookie).decode("ascii")
+        except InvalidToken:
+            pass  # maybe warn
+    return None
+
+
+def set_encrypted_cookie(key: str, value: str):
+    """Store an encrypted cookie"""
+    session[key] = app.config["fernet"].encrypt(value.encode("ascii"))
+
+
+def generate_jwt() -> str:
+    """Generate a JWT for the SMART asymmetric client authentication"""
     jwt_dict = {
-        "iss": "client",
-        "sub": "client",
-        "aud": config.token_url,
+        "iss": app.config["client_id"],
+        "sub": app.config["client_id"],
+        "aud": session["smart_config"]["token_url"],
         "jti": "jwt_id",
         "exp": int(time.time() + 3600),
     }
-    headers = {"kid": key_id}
-    with open(key_file, "rb") as f:
+    ((key_id, private_key_path),) = app.config["keys"].items()
+    with open(private_key_path, "rb") as f:
         private_key = f.read()
+    headers = {"kid": key_id}
     return jwt.encode(jwt_dict, private_key, "RS256", headers)
 
 
-def token_for_code(code: str):
-    config = SMARTConfig(**session.get("smart_config"))
+def token_for_code(code: str) -> str:
+    """Exchange an authorization code for an access token"""
     data = dict(
-        client_id="marvin",
+        client_id=app.config["client_id"],
         grant_type="authorization_code",
         code=code,
-        redirect_uri=config.base_url + "oauth_callback",
+        redirect_uri=session["smart_config"]["base_url"] + "oauth_callback",
         client_assertion_type="urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
         client_assertion=generate_jwt(),
     )
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    token_reply = requests.post(config.token_url, data=data, headers=headers)
-    return token_reply.json()["access_token"]
+    token_reply = requests.post(
+        session["smart_config"]["token_url"], data=data, headers=headers
+    )
+    try:
+        return token_reply.json()["access_token"]
+    except KeyError:
+        raise ValueError(
+            f"No access token in token reply: received error messsage {token_reply.get('error_description')}"
+        )
 
 
 def authenticated(f):
@@ -57,59 +88,63 @@ def authenticated(f):
 
     @wraps(f)
     def decorated(*args, **kwargs):
-        if token := request.cookies.get("smart_token"):
+
+        if token := get_encrypted_cookie("smart_token"):
             return f(token, *args, **kwargs)
 
         else:
             session["smart_config"] = SMARTConfig.from_url(
-                request.args.get("iss"), request.base_url
-            )
+                request.args["iss"],
+                request.base_url,
+                scopes=os.environ.get("SCOPES", "").split(),
+            ).to_dict()
             state = generate_state(next_url=request.path)
-            from_redirect = make_response(start_oauth_flow(state_id=state["id"]))
-            from_redirect.set_cookie(
-                "state_id", state["id"], secure=True, httponly=True
-            )
-            from_redirect.set_cookie("next_url", state["next_url"])
-            return from_redirect
+            for key in ("next_url", "state_id"):
+                set_encrypted_cookie(key, state[key])
+            return make_response(start_oauth_flow(state_id=state["state_id"]))
 
     return decorated
 
 
-def start_oauth_flow(state_id: str, scopes: list[str] | None = None):
-    config = session.get("smart_config")
+def start_oauth_flow(state_id: str, scopes: list[str] | None = None) -> Response:
+    """Start the OAuth flow by redirecting to the authorization endpoint"""
+    config = SMARTConfig(**session.get("smart_config"))
     redirect_uri = config.base_url + "oauth_callback"
     scopes = scopes or config.scopes
     headers = {
         "aud": config.fhir_url,
         "state": state_id,
         "redirect_uri": redirect_uri,
-        "launch": request.args.get("launch"),
-        "client_id": "marvin",
+        "launch": request.args["launch"],
+        "client_id": app.config["client_id"],
         "response_type": "code",
         "scopes": " ".join(scopes),
     }
     auth_url = f"{config.auth_url}?{urlencode(headers)}"
-    response = redirect(auth_url)
-    return response
+    return redirect(auth_url)
 
 
 @app.route(prefix)
 @authenticated
-def fetch_data(token: str):
+def fetch_data(token: str) -> Response:
+    """Fetch data from a FHIR endpoint"""
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/fhir+json",
         "User-Agent": "JupyterHub",
     }
-    url = f"{SMARTConfig(**session['smart_config']).fhir_url}/Condition"  # Endpoint with data
+    url = f"{session['smart_config']['fhir_url']}/Condition"  # Endpoint with data
     f = requests.get(url, headers=headers)
     return Response(f.text, mimetype="application/json")
 
 
 @app.route(prefix + "oauth_callback")
-def callback():
-    state_id = request.cookies.get("state_id")
-    next_url = request.cookies.get("next_url")
+def callback() -> Response:
+    """Callback endpoint to finish OAuth flow"""
+    state_id = get_encrypted_cookie("state_id")
+    if not state_id:
+        return Response("No local state ID cookie found", status=400)
+    next_url = get_encrypted_cookie("next_url") or "/"
 
     if error := request.args.get("error", False):
         return Response(
@@ -123,6 +158,5 @@ def callback():
     if arg_state != state_id:
         return Response("OAuth state does not match. Try logging in again.", status=403)
     token = token_for_code(code)
-    to_next_url = make_response(redirect(next_url))
-    to_next_url.set_cookie("smart_token", token, secure=True, httponly=True)
-    return to_next_url
+    set_encrypted_cookie("smart_token", token)
+    return make_response(redirect(next_url))
