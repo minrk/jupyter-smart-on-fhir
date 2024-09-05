@@ -23,7 +23,6 @@ app = Flask(__name__)
 
 # encryption key for session cookies
 secret_key = base64.urlsafe_b64encode(secrets.token_bytes(32))
-app.config["SECRET_KEY"] = secret_key
 app.config["fernet"] = Fernet(secret_key)
 # settings passed from the Hub
 app.config["client_id"] = os.environ["CLIENT_ID"]
@@ -62,7 +61,7 @@ def generate_jwt() -> str:
     return jwt.encode(jwt_dict, private_key, "RS256", headers)
 
 
-def token_for_code(code: str):
+def token_for_code(code: str) -> str:
     """Exchange an authorization code for an access token"""
     data = dict(
         client_id=app.config["client_id"],
@@ -107,7 +106,7 @@ def authenticated(f):
     return decorated
 
 
-def start_oauth_flow(state_id: str, scopes: list[str] | None = None):
+def start_oauth_flow(state_id: str, scopes: list[str] | None = None) -> Response:
     """Start the OAuth flow by redirecting to the authorization endpoint"""
     config = SMARTConfig(**session.get("smart_config"))
     redirect_uri = config.base_url + "oauth_callback"
@@ -127,7 +126,7 @@ def start_oauth_flow(state_id: str, scopes: list[str] | None = None):
 
 @app.route(prefix)
 @authenticated
-def fetch_data(token: str):
+def fetch_data(token: str) -> Response:
     """Fetch data from a FHIR endpoint"""
     headers = {
         "Authorization": f"Bearer {token}",
@@ -140,7 +139,7 @@ def fetch_data(token: str):
 
 
 @app.route(prefix + "oauth_callback")
-def callback():
+def callback() -> Response:
     """Callback endpoint to finish OAuth flow"""
     state_id = get_encrypted_cookie("state_id")
     if not state_id:

@@ -66,7 +66,7 @@ class SMARTAuthHandler(JupyterHandler):
             self.write(f"Authorization success: Fetched {str(data)}")
             self.finish()
 
-    def get_data(self, token: str):
+    def get_data(self, token: str) -> dict:
         headers = {
             "Authorization": f"Bearer {token}",
             "Accept": "application/fhir+json",
@@ -113,7 +113,7 @@ class SMARTLoginHandler(JupyterHandler):
 class SMARTCallbackHandler(JupyterHandler):
     """Callback handler for SMART on FHIR"""
 
-    def token_for_code(self, code: str):
+    def token_for_code(self, code: str) -> str:
         data = dict(
             client_id=self.settings["client_id"],
             grant_type="authorization_code",

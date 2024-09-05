@@ -4,7 +4,6 @@ import secrets
 import jwt
 import json
 import os
-import time
 from pathlib import Path
 
 
@@ -20,7 +19,7 @@ class SMARTConfig:
     broadcast_path: str = ".well-known/smart-configuration"
 
     @classmethod
-    def from_url(cls, iss: str, base_url: str, **kwargs):
+    def from_url(cls, iss: str, base_url: str, **kwargs) -> "SMARTConfig":
         app_config = requests.get(f"{iss}/{cls.broadcast_path}").json()
         scopes = kwargs.pop("scopes", [])
         return cls(
