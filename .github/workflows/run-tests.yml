@@ -29,10 +29,10 @@ jobs:
     - run: docker run -d -p 8080:80 --name smart-launcher smartonfhir/smart-launcher-2:latest
     - name: Wait until ready
     - run: |
-      until curl -s http://localhost:8080 > /dev/null; do
-        echo "Waiting for container startup"
-        sleep 5
-      done
+        until curl -s http://localhost:8080 > /dev/null; do
+          echo "Waiting for container startup"
+          sleep 5
+        done
     - name: Run tests
       run: |
         pytest tests/
