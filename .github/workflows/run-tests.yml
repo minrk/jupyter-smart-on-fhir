@@ -24,11 +24,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install -e .[testing]
     - name: Pull Docker image
-    - run: docker pull smartonfhir/smart-launcher-2:latest
+      run: docker pull smartonfhir/smart-launcher-2:latest
     - name: Run docker container 
-    - run: docker run -d -p 8080:80 --name smart-launcher smartonfhir/smart-launcher-2:latest
+      run: docker run -d -p 8080:80 --name smart-launcher smartonfhir/smart-launcher-2:latest
     - name: Wait until ready
-    - run: |
+      run: |
         until curl -s http://localhost:8080 > /dev/null; do
           echo "Waiting for container startup"
           sleep 5
