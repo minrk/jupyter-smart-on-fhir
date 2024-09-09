@@ -1,4 +1,4 @@
-name: Run demo tests
+name: Smart on FHIR in JH tests
 
 on:
   push:
@@ -11,6 +11,10 @@ jobs:
     strategy:
       matrix:
         python-version: [3.12] # extend if needed
+
+    env:
+      JUPYTERHUB_API_TOKEN: "API_TOKEN"
+      CLIENT_ID: "CLIENT_ID"
 
     steps:
     - uses: actions/checkout@v4
