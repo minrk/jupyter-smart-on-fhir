@@ -16,6 +16,7 @@ from flask import (
     request,
     session,
     current_app,
+    abort,
 )
 import requests
 from urllib.parse import urlencode
@@ -138,16 +139,21 @@ def authenticated(f):
 
     @wraps(f)
     def decorated(*args, **kwargs):
+        if "iss" not in request.args:
+            abort(
+                400,
+                "GET request does not have iss parameter. Was service launched from EHR?",
+            )
 
         if token := get_encrypted_cookie("smart_token"):
             return f(token, *args, **kwargs)
-
         else:
             session["smart_config"] = SMARTConfig.from_url(
                 request.args["iss"],
                 request.base_url,
                 scopes=os.environ.get("SCOPES", "").split(),
             ).to_dict()
+
             state = generate_state(next_url=request.path)
             for key in ("next_url", "state_id"):
                 set_encrypted_cookie(key, state[key])
