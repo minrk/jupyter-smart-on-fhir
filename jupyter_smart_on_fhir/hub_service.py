@@ -16,7 +16,6 @@ from flask import (
     request,
     session,
     current_app,
-    abort,
 )
 import requests
 from urllib.parse import urlencode
@@ -140,9 +139,9 @@ def authenticated(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if "iss" not in request.args:
-            abort(
-                400,
-                "GET request does not have iss parameter. Was service launched from EHR?",
+            return Response(
+                "GET request misses 'iss' argument. Was service launched from EHR?",
+                status=400,
             )
 
         if token := get_encrypted_cookie("smart_token"):
