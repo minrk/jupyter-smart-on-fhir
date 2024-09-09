@@ -8,8 +8,15 @@ import os
 import time
 import secrets
 from functools import wraps
-from flask import Flask, Response, make_response, redirect, request, session
-from jupyterhub.services.auth import HubOAuth
+from flask import (
+    Flask,
+    Response,
+    make_response,
+    redirect,
+    request,
+    session,
+    current_app,
+)
 import requests
 from urllib.parse import urlencode
 import jwt
@@ -18,15 +25,58 @@ from jupyter_smart_on_fhir.auth import SMARTConfig, generate_state, validate_key
 from cryptography.fernet import Fernet, InvalidToken
 
 prefix = os.environ.get("JUPYTERHUB_SERVICE_PREFIX", "/")
-auth = HubOAuth(api_token=os.environ["JUPYTERHUB_API_TOKEN"], cache_max_age=60)
-app = Flask(__name__)
 
-# encryption key for session cookies
-secret_key = base64.urlsafe_b64encode(secrets.token_bytes(32))
-app.config["fernet"] = Fernet(secret_key)
-# settings passed from the Hub
-app.config["client_id"] = os.environ["CLIENT_ID"]
-app.config["keys"] = validate_keys()
+
+def create_app():
+    """Create the Flask app with configuration"""
+    app = Flask(__name__)
+    # encryption key for session cookies
+    secret_key = secrets.token_bytes(32)
+    app.secret_key = secret_key
+    app.config["fernet"] = Fernet(base64.urlsafe_b64encode(secret_key))
+    # settings passed from the Hub
+    app.config["client_id"] = os.environ["CLIENT_ID"]
+    app.config["keys"] = validate_keys()
+
+    @app.route(prefix)
+    @authenticated
+    def fetch_data(token: str) -> Response:
+        """Fetch data from a FHIR endpoint"""
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/fhir+json",
+            "User-Agent": "JupyterHub",
+        }
+        url = f"{session['smart_config']['fhir_url']}/Condition"  # Endpoint with data
+        f = requests.get(url, headers=headers)
+        return Response(f.text, mimetype="application/json")
+
+    @app.route(prefix + "oauth_callback")
+    def callback() -> Response:
+        """Callback endpoint to finish OAuth flow"""
+        state_id = get_encrypted_cookie("state_id")
+        if not state_id:
+            return Response("No local state ID cookie found", status=400)
+        next_url = get_encrypted_cookie("next_url") or "/"
+
+        if error := request.args.get("error", False):
+            return Response(
+                f"Error in OAuth: {request.args.get('error_description', error)}",
+                status=400,
+            )
+        code = request.args.get("code")
+        if not code:
+            return Response("OAuth callback made without a token", status=400)
+        arg_state = request.args.get("state", None)
+        if arg_state != state_id:
+            return Response(
+                "OAuth state does not match. Try logging in again.", status=403
+            )
+        token = token_for_code(code)
+        set_encrypted_cookie("smart_token", token)
+        return make_response(redirect(next_url))
+
+    return app
 
 
 def get_encrypted_cookie(key: str) -> str | None:
@@ -34,7 +84,7 @@ def get_encrypted_cookie(key: str) -> str | None:
     cookie = session.get(key)
     if cookie:
         try:
-            return app.config["fernet"].decrypt(cookie).decode("ascii")
+            return current_app.config["fernet"].decrypt(cookie).decode("ascii")
         except InvalidToken:
             pass  # maybe warn
     return None
@@ -42,19 +92,19 @@ def get_encrypted_cookie(key: str) -> str | None:
 
 def set_encrypted_cookie(key: str, value: str):
     """Store an encrypted cookie"""
-    session[key] = app.config["fernet"].encrypt(value.encode("ascii"))
+    session[key] = current_app.config["fernet"].encrypt(value.encode("ascii"))
 
 
 def generate_jwt() -> str:
     """Generate a JWT for the SMART asymmetric client authentication"""
     jwt_dict = {
-        "iss": app.config["client_id"],
-        "sub": app.config["client_id"],
+        "iss": current_app.config["client_id"],
+        "sub": current_app.config["client_id"],
         "aud": session["smart_config"]["token_url"],
         "jti": "jwt_id",
         "exp": int(time.time() + 3600),
     }
-    ((key_id, private_key_path),) = app.config["keys"].items()
+    ((key_id, private_key_path),) = current_app.config["keys"].items()
     with open(private_key_path, "rb") as f:
         private_key = f.read()
     headers = {"kid": key_id}
@@ -64,7 +114,7 @@ def generate_jwt() -> str:
 def token_for_code(code: str) -> str:
     """Exchange an authorization code for an access token"""
     data = dict(
-        client_id=app.config["client_id"],
+        client_id=current_app.config["client_id"],
         grant_type="authorization_code",
         code=code,
         redirect_uri=session["smart_config"]["base_url"] + "oauth_callback",
@@ -116,47 +166,9 @@ def start_oauth_flow(state_id: str, scopes: list[str] | None = None) -> Response
         "state": state_id,
         "redirect_uri": redirect_uri,
         "launch": request.args["launch"],
-        "client_id": app.config["client_id"],
+        "client_id": current_app.config["client_id"],
         "response_type": "code",
         "scopes": " ".join(scopes),
     }
     auth_url = f"{config.auth_url}?{urlencode(headers)}"
     return redirect(auth_url)
-
-
-@app.route(prefix)
-@authenticated
-def fetch_data(token: str) -> Response:
-    """Fetch data from a FHIR endpoint"""
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/fhir+json",
-        "User-Agent": "JupyterHub",
-    }
-    url = f"{session['smart_config']['fhir_url']}/Condition"  # Endpoint with data
-    f = requests.get(url, headers=headers)
-    return Response(f.text, mimetype="application/json")
-
-
-@app.route(prefix + "oauth_callback")
-def callback() -> Response:
-    """Callback endpoint to finish OAuth flow"""
-    state_id = get_encrypted_cookie("state_id")
-    if not state_id:
-        return Response("No local state ID cookie found", status=400)
-    next_url = get_encrypted_cookie("next_url") or "/"
-
-    if error := request.args.get("error", False):
-        return Response(
-            f"Error in OAuth: {request.args.get('error_description', error)}",
-            status=400,
-        )
-    code = request.args.get("code")
-    if not code:
-        return Response("OAuth callback made without a token", status=400)
-    arg_state = request.args.get("state", None)
-    if arg_state != state_id:
-        return Response("OAuth state does not match. Try logging in again.", status=403)
-    token = token_for_code(code)
-    set_encrypted_cookie("smart_token", token)
-    return make_response(redirect(next_url))
