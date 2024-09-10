@@ -23,16 +23,14 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -e .[testing]
-    - name: Pull Docker image
-      run: docker pull smartonfhir/smart-launcher-2:latest
-    - name: Run docker container 
-      run: docker run -d -p 8080:80 --name smart-launcher smartonfhir/smart-launcher-2:latest
-    - name: Wait until ready
+    - name: Download SMART sandbox
+      run: git clone https://github.com/smart-on-fhir/smart-launcher-v2.git
+    - name: Build sandbox
       run: |
-        until curl -s http://localhost:8080 > /dev/null; do
-          echo "Waiting for container startup"
-          sleep 5
-        done
+        npm run build
+      env: 
+        NODE_ENV: production
+        PORT: 5555
     - name: Run tests
       run: |
         pytest tests/
