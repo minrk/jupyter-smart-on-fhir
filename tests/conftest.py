@@ -23,6 +23,7 @@ def sandbox():
         except requests.ConnectionError:
             pass
         time.sleep(1)  # Wait for 1 second before retrying
-
+    else:
+        raise requests.ConnectionError(f"Cannot connect to {url}")
     yield url
     a.kill()
