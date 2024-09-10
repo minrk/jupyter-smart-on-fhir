@@ -31,7 +31,7 @@ jobs:
       run: | 
         git clone https://github.com/smart-on-fhir/smart-launcher-v2.git
         cd smart-launcher-v2
-        npm ci --omit=dev
+        npm ci
         npm run build
       env: 
         PORT: 5555
