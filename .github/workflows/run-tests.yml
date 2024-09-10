@@ -23,10 +23,11 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -e .[testing]
-    - name: Download SMART sandbox
-      run: git clone https://github.com/smart-on-fhir/smart-launcher-v2.git
-    - name: Build sandbox
-      run: |
+    - name: Build SMART sandbox
+      run: | 
+        git clone https://github.com/smart-on-fhir/smart-launcher-v2.git
+        cd smart-launcher-v2
+        npm install -g
         npm run build
       env: 
         NODE_ENV: production
@@ -34,5 +35,7 @@ jobs:
     - name: Run tests
       run: |
         pytest tests/
+      env: 
+        SANDBOX_DIR: ${{ github.workspace }}/smart-launcher-v2
 
     
