@@ -8,6 +8,7 @@ from jupyter_smart_on_fhir.hub_service import (
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 import os
+import requests
 
 
 @pytest.fixture(scope="module")
@@ -99,3 +100,9 @@ def test_invalid_token(test_app):
         session["invalid_key"] = b"invalid_token"
         value = get_encrypted_cookie("invalid_key")
         assert value is None
+
+
+def test_access_sandbox(sandbox):
+    f = requests.get(sandbox)
+    print(f.status_code, f.text)
+    assert f.status_code == 200

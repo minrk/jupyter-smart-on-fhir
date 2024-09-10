@@ -10,8 +10,7 @@ def sandbox():
     port = 5555
     os.environ["PORT"] = str(port)
     a = subprocess.Popen(
-        ["npm", "run", "start:prod"],
-        cwd=os.environ.get("SANDBOX_DIR", ".")
+        ["npm", "run", "start:prod"], cwd=os.environ.get("SANDBOX_DIR", ".")
     )
     url = f"http://localhost:{port}"
 
