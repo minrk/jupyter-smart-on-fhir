@@ -31,7 +31,7 @@ class SMARTExtensionApp(ExtensionApp):
     ).tag(config=True)
 
     client_id = Unicode(
-        help="""Client ID for the SMART application""", default_value="test-id"
+        help="""Client ID for the SMART application""", default_value="test_id"
     ).tag(config=True)
 
     def initialize_settings(self):
@@ -88,7 +88,10 @@ class SMARTLoginHandler(JupyterHandler):
     @tornado.web.authenticated
     def get(self):
         state = generate_state()
-        self.set_secure_cookie(**state)
+        self.set_secure_cookie("state_id", state["state_id"])
+        if state["next_url"]:
+            self.set_secure_cookie("next_url", state["next_url"])
+
         scopes = self.settings["scopes"]
         smart_config = self.settings["smart_config"]
         auth_url = smart_config.auth_url
@@ -98,7 +101,7 @@ class SMARTLoginHandler(JupyterHandler):
         code_challenge = base64.urlsafe_b64encode(code_challenge_b).rstrip(b"=")
         headers = {
             "aud": smart_config.fhir_url,
-            "state": state["id"],
+            "state": state["state_id"],
             "launch": self.settings["launch"],
             "redirect_uri": urljoin(self.request.full_url(), callback_path),
             "client_id": self.settings["client_id"],

@@ -13,12 +13,16 @@ from urllib import parse
 def sandbox():
     port = 5555
     os.environ["PORT"] = str(port)
-    a = subprocess.Popen(
-        ["npm", "run", "start:prod"], cwd=os.environ.get("SANDBOX_DIR", ".")
-    )
     url = f"http://localhost:{port}"
+    with subprocess.Popen(
+        ["npm", "run", "start:prod"], cwd=os.environ.get("SANDBOX_DIR", ".")
+    ) as sandbox_proc:
+        wait_for_server(url)
+        yield url
+        sandbox_proc.terminate()
 
-    # Wait until the frontend is ready
+
+def wait_for_server(url):
     for _ in range(10):
         try:
             response = requests.get(url)
@@ -29,15 +33,13 @@ def sandbox():
         time.sleep(1)  # Wait for 1 second before retrying
     else:
         raise requests.ConnectionError(f"Cannot connect to {url}")
-    yield url
-    a.kill()
 
 
 @dataclass
 class SandboxConfig:
     """Taken from smart-on-fhir/smart-launcher-v2.git:src/isomorphic/LaunchOptions.ts.
-    The sandbox reads its configuration from the url it's launched with.
-    This means we don't have to introduce a webdriver to manipulate it's behaviour,
+    The sandbox reads its configuration from the url it is launched with.
+    This means we don't have to introduce a webdriver to manipulate its behaviour,
     but instead we can reverse engineer the parameters to set the necessary parameters
     """
 
