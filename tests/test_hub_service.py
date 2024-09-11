@@ -157,4 +157,4 @@ def test_to_auth_url(sandbox, client, asymmetric_auth):
         #     }
         #     token = token_for_code(code)
         #     assert isinstance(token, str)
-        # FIXME: The session seems to be empty, but only for this method. Don't understand why
+        # FIXME: The session seems to be empty, but only for the token_for_code method. Confusing

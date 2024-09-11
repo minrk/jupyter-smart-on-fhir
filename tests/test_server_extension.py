@@ -1,6 +1,5 @@
 import os
 import subprocess
-from urllib.parse import urlencode, unquote
 import requests
 import pytest
 from conftest import wait_for_server, SandboxConfig
@@ -69,6 +68,7 @@ def public_client():
 
 
 def test_login_handler(jupyter_server, sandbox, public_client):
+    """I think this test can be splitted in three with some engineering. Perhaps useful, not sure"""
     session = requests.Session()
     # Try endpoint and get redirected to login
     query = {"iss": f"{sandbox}/v/r4/fhir", "launch": public_client.get_launch_code()}
@@ -87,7 +87,6 @@ def test_login_handler(jupyter_server, sandbox, public_client):
     # Internally, get redirected to provider-auth
     response = request_api(auth_url, session=session, allow_redirects=False)
     assert response.status_code == 302
-    auth_url = response.headers["Location"]
     callback_url = response.headers["Location"]
     assert callback_url.startswith(ext_url + callback_path)
     assert "code=" in callback_url
