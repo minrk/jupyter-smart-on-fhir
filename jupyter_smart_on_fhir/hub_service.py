@@ -66,7 +66,9 @@ def create_app():
             )
         code = request.args.get("code")
         if not code:
-            return Response("OAuth callback made without a token", status=400)
+            return Response(
+                "OAuth callback did not return authorization code", status=400
+            )
         arg_state = request.args.get("state", None)
         if arg_state != state_id:
             return Response(
@@ -152,7 +154,6 @@ def authenticated(f):
                 request.base_url,
                 scopes=os.environ.get("SCOPES", "").split(),
             ).to_dict()
-
             state = generate_state(next_url=request.path)
             for key in ("next_url", "state_id"):
                 set_encrypted_cookie(key, state[key])

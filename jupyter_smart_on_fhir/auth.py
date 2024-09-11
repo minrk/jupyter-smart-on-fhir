@@ -60,7 +60,7 @@ def get_jwks_from_key(key_file: Path, key_id: str = "1") -> str:
     jwk = alg.to_jwk(key, as_dict=True)
     jwk.update({"alg": "RS256", "kid": key_id})
     jwks_smart = {"keys": [jwk]}
-    jwks_smart_str = json.dumps(jwks_smart, indent=2)
+    jwks_smart_str = json.dumps(jwks_smart)
     return jwks_smart_str
 
 

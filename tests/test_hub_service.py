@@ -1,14 +1,19 @@
 import pytest
 from flask import session
+from jupyter_smart_on_fhir.auth import get_jwks_from_key
 from jupyter_smart_on_fhir.hub_service import (
     create_app,
     set_encrypted_cookie,
     get_encrypted_cookie,
+    prefix,
+    token_for_code,
 )
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 import os
 import requests
+from conftest import SandboxConfig
+from urllib import parse
 
 
 @pytest.fixture(scope="module")
@@ -51,6 +56,12 @@ def test_app(mock_env):
     app = create_app()
     app.config["TESTING"] = True
     return app
+
+
+@pytest.fixture(scope="function")
+def asymmetric_auth(keys):
+    jwks = get_jwks_from_key(keys["SSH_KEY_PATH"], keys["SSH_KEY_ID"])
+    return SandboxConfig(client_id=os.environ["CLIENT_ID"], jwks=jwks, client_type=2)
 
 
 @pytest.fixture(scope="function")
@@ -106,3 +117,44 @@ def test_access_sandbox(sandbox):
     f = requests.get(sandbox)
     print(f.status_code, f.text)
     assert f.status_code == 200
+
+
+def test_to_auth_url(sandbox, client, asymmetric_auth):
+    # start with oauth flow
+    query = {"iss": f"{sandbox}/v/r4/fhir", "launch": asymmetric_auth.get_launch_code()}
+    scopes = ["launch", "profile"]
+    os.environ["SCOPES"] = " ".join(scopes)
+    # set up test context
+    with client.application.test_request_context():
+        # Launch request from sandbox with given settings
+        response = client.get(f"/?{parse.urlencode(query)}")
+        # Expecting a redirect to the login page
+        assert response.status_code == 302
+
+        auth_url = response.headers["Location"]
+        # Ensure auth url has correct domain and scopes
+        assert auth_url.startswith(sandbox)
+        assert "+".join(scopes) in auth_url
+
+        # Check if auth_url passes strict client validation and provides code
+        f = requests.get(auth_url, allow_redirects=False)
+        assert f.status_code == 302
+
+        callback_url = f.headers["Location"]
+        assert "code" in callback_url
+        assert prefix + "oauth_callback" in callback_url
+        parsed_url = parse.urlparse(callback_url)
+        qs = parse.parse_qs(parsed_url.query)
+        code = qs["code"][0]
+        # Test if we can exchange the code for a token with asymmetric validation
+        # with client.session_transaction() as sess:
+        #     sess["smart_config"] = {
+        #         "base_url": sandbox,
+        #         "fhir_url": f"{sandbox}/v/r4/fhir",
+        #         "token_url": f"{sandbox}/token",
+        #         "auth_url": f"{sandbox}/authorize",
+        #         "scopes": scopes,
+        #     }
+        #     token = token_for_code(code)
+        #     assert isinstance(token, str)
+        # FIXME: The session seems to be empty, but only for this method. Don't understand why
