@@ -1,0 +1,45 @@
+name: JupyterHealth SMART on FHIR test suite
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.12] # extend if needed
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18.x'
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: "pip"
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[testing]
+    - name: Install SMART sandbox
+      run: | 
+        git clone https://github.com/smart-on-fhir/smart-launcher-v2.git
+        cd smart-launcher-v2
+        git switch -c aa0f3b1 # Fix the version we use for the sandbox
+        npm ci
+        npm run build
+      env: 
+        PORT: 5555
+    - name: Run tests
+      run: |
+        pytest tests/
+      env: 
+        SANDBOX_DIR: ${{ github.workspace }}/smart-launcher-v2
+
+    
