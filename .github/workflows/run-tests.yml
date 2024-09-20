@@ -26,7 +26,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e .[testing]
+          pip install -e .[test]
       - name: Install SMART sandbox
         run: |
           git clone https://github.com/smart-on-fhir/smart-launcher-v2.git
@@ -34,8 +34,6 @@ jobs:
           git switch -c aa0f3b1 # Fix the version we use for the sandbox
           npm ci
           npm run build
-        env:
-          PORT: 5555
       - name: Run tests
         run: |
           pytest tests/

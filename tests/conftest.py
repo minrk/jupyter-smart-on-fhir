@@ -9,6 +9,8 @@ from urllib import parse
 import pytest
 import requests
 
+pytest_plugins = ["pytest_jupyter.jupyter_server"]
+
 
 @pytest.fixture(scope="function")  # module?
 def sandbox():
@@ -16,7 +18,7 @@ def sandbox():
     os.environ["PORT"] = str(port)
     url = f"http://localhost:{port}"
     with subprocess.Popen(
-        ["npm", "run", "start:prod"], cwd=os.environ.get("SANDBOX_DIR", ".")
+        ["npm", "run", "start:prod"], cwd=os.environ["SANDBOX_DIR"]
     ) as sandbox_proc:
         wait_for_server(url)
         yield url

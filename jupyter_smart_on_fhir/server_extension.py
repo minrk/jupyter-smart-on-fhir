@@ -1,12 +1,14 @@
 import base64
 import hashlib
+import json
 import secrets
 from urllib.parse import urlencode, urljoin
 
-import requests
 import tornado
 from jupyter_server.base.handlers import JupyterHandler
 from jupyter_server.extension.application import ExtensionApp
+from jupyter_server.utils import url_path_join
+from tornado.httpclient import AsyncHTTPClient
 from traitlets import List, Unicode
 
 from jupyter_smart_on_fhir.auth import SMARTConfig, generate_state
@@ -54,21 +56,22 @@ class SMARTAuthHandler(JupyterHandler):
     """Handler for SMART on FHIR authentication"""
 
     @tornado.web.authenticated
-    def get(self):
+    async def get(self):
         fhir_url = self.get_argument("iss")
         smart_config = SMARTConfig.from_url(fhir_url, self.request.full_url())
         self.settings["launch"] = self.get_argument("launch")
         self.settings["smart_config"] = smart_config
         token = self.settings.get("smart_token")
         if not token:
+            # TODO: persist next_url differently
             self.settings["next_url"] = self.request.uri
             self.redirect(login_path)
         else:
-            data = self.get_data(token)
+            data = await self.get_data(token)
             self.write(f"Authorization success: Fetched {str(data)}")
             self.finish()
 
-    def get_data(self, token: str) -> dict:
+    async def get_data(self, token: str) -> dict:
         headers = {
             "Authorization": f"Bearer {token}",
             "Accept": "application/fhir+json",
@@ -77,11 +80,8 @@ class SMARTAuthHandler(JupyterHandler):
         url = (
             f"{self.settings['smart_config'].fhir_url}/Condition"  # Endpoint with data
         )
-        f = requests.get(url, headers=headers)
-        try:
-            return f.json()
-        except requests.exceptions.JSONDecodeError:
-            raise RuntimeError(f.text)
+        resp = await AsyncHTTPClient().fetch(url, headers=headers)
+        return json.loads(resp.body.decode("utf8", "replace"))
 
 
 class SMARTLoginHandler(JupyterHandler):
@@ -105,7 +105,9 @@ class SMARTLoginHandler(JupyterHandler):
             "aud": smart_config.fhir_url,
             "state": state["state_id"],
             "launch": self.settings["launch"],
-            "redirect_uri": urljoin(self.request.full_url(), callback_path),
+            "redirect_uri": urljoin(
+                self.request.full_url(), url_path_join(self.base_url, callback_path)
+            ),
             "client_id": self.settings["client_id"],
             "code_challenge": code_challenge,
             "code_challenge_method": "S256",
@@ -118,22 +120,27 @@ class SMARTLoginHandler(JupyterHandler):
 class SMARTCallbackHandler(JupyterHandler):
     """Callback handler for SMART on FHIR"""
 
-    def token_for_code(self, code: str) -> str:
+    async def token_for_code(self, code: str) -> str:
         data = dict(
             client_id=self.settings["client_id"],
             grant_type="authorization_code",
             code=code,
-            code_verifier=self.get_signed_cookie("code_verifier"),
-            redirect_uri=urljoin(self.request.full_url(), callback_path),
+            code_verifier=self.get_signed_cookie("code_verifier").decode("ascii"),
+            redirect_uri=urljoin(
+                self.request.full_url(), url_path_join(self.base_url, callback_path)
+            ),
         )
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        token_reply = requests.post(
-            self.settings["smart_config"].token_url, data=data, headers=headers
+        token_reply = await AsyncHTTPClient().fetch(
+            self.settings["smart_config"].token_url,
+            body=urlencode(data),
+            headers=headers,
+            method="POST",
         )
-        return token_reply.json()["access_token"]
+        return json.loads(token_reply.body.decode("utf8", "replace"))["access_token"]
 
     @tornado.web.authenticated
-    def get(self):
+    async def get(self):
         if "error" in self.request.arguments:
             raise tornado.web.HTTPError(400, self.get_argument("error"))
         code = self.get_argument("code")
@@ -141,12 +148,19 @@ class SMARTCallbackHandler(JupyterHandler):
             raise tornado.web.HTTPError(
                 400, "Error: no code in response from FHIR server"
             )
-        state_id = self.get_signed_cookie("state_id").decode("utf-8")
-        if self.get_argument("state") != state_id:
+        state_id = self.get_signed_cookie("state_id")
+        if state_id is None:
+            raise tornado.web.HTTPError(400, "Error: missing state cookie")
+        state_id = state_id.decode("utf-8")
+        arg_state = self.get_argument("state")
+        if not arg_state:
+            raise tornado.web.HTTPError(400, "Error: missing state argument")
+        if arg_state != state_id:
             raise tornado.web.HTTPError(
                 400, "Error: state received from FHIR server does not match"
             )
-        self.settings["smart_token"] = self.token_for_code(code)
+        self.settings["smart_token"] = await self.token_for_code(code)
+        # TODO: persist next_url differently
         self.redirect(self.settings["next_url"])
 
 
