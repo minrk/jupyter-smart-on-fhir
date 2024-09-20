@@ -5,18 +5,21 @@ This project contains a demo of a JupyterHub service that acts as a confidential
 ## Installation
 
 1. Clone this repository:
+
    ```
    git clone https://github.com/jupyterhealth/smart-fhir-jupyter-demo.git
    cd smart-fhir-jupyter-demo/hub_service
    ```
 
 2. Create and activate a virtual environment:
+
    ```
    python -m venv .venv
-   source .venv/bin/activate 
+   source .venv/bin/activate
    ```
 
 3. Install the required dependencies:
+
    ```
    pip install -e .
    ```
@@ -30,6 +33,7 @@ This project contains a demo of a JupyterHub service that acts as a confidential
 ## Configuration
 
 1. Update the `jupyterhub_config.py` file with your SMART on FHIR server details:
+
    - Set the `fhir_base_url` to the sandbox server's URL
 
 2. As a confidential client, this needs a public/private key pair. For demo purposes, the script takes care of generating this keypair.
@@ -39,4 +43,5 @@ This project contains a demo of a JupyterHub service that acts as a confidential
 Once authenticated, users can make requests to the FHIR server through the service. The service handles token management and SMART on FHIR authentication flow.
 
 Example:
+
 - Accessing `http://localhost:8000/hub/fhir` will fetch Condition resources from the FHIR server.

@@ -1,6 +1,6 @@
 # SMART App demo with Jupyter
 
-This is a Jupyter server extension that fetches data from a SMART on FHIR endpoint. 
+This is a Jupyter server extension that fetches data from a SMART on FHIR endpoint.
 
 _work in progress_
 
@@ -9,15 +9,17 @@ _work in progress_
 ## Local Installation with pip
 
 1. Clone the repository:
+
    ```
    git clone https://github.com/jupyterhealth/smart-fhir-jupyter-demo.git
    cd smart-fhir-jupyter-demo/server_extension
    ```
 
 2. Create and activate a virtual environment:
+
    ```
    python -m venv .venv
-   source .venv/bin/activate 
+   source .venv/bin/activate
    ```
 
 3. Install the Jupyter server extension:
@@ -28,6 +30,7 @@ _work in progress_
 ## Installation with Docker
 
 1. Clone the repository:
+
    ```
    git clone https://github.com/jupyterhealth/smart-fhir-jupyter-demo.git
    cd smart-fhir-jupyter-demo/server_extension
@@ -45,20 +48,23 @@ _work in progress_
 1. Ensure you're in the project directory and your virtual environment is activated.
 
 2. Enable the server extension:
+
    ```
    jupyter server extension enable jupyter_smart_on_fhir.server_extension
    ```
 
-2. Start the Jupyter server:
+3. Start the Jupyter server:
+
    ```
    jupyter server
    ```
 
-3. Open a web browser and navigate to `http://localhost:8888` to access the Jupyter interface.
+4. Open a web browser and navigate to `http://localhost:8888` to access the Jupyter interface.
 
 ## Running with Docker
 
 1. Run the Docker container:
+
    ```
    docker run -p 8888:8888 smart-server-extension
    ```
@@ -71,7 +77,3 @@ _work in progress_
    ```
    http://localhost:8888/extension/fhir
    ```
-
-
-
-

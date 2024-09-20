@@ -1,10 +1,11 @@
-from dataclasses import dataclass, asdict
-import requests
-import secrets
-import jwt
 import json
 import os
+import secrets
+from dataclasses import asdict, dataclass
 from pathlib import Path
+
+import jwt
+import requests
 
 
 @dataclass
@@ -47,7 +48,7 @@ def generate_state(next_url=None) -> dict:
 def get_jwks_from_key(key_file: Path, key_id: str = "1") -> str:
     """Generate a JWKS from a public key file. Not required for end users, but useful for development"""
     try:
-        with open(key_file + ".pub", "r") as f:
+        with open(key_file + ".pub") as f:
             public_key = f.read()
     except FileNotFoundError as e:
         raise FileNotFoundError(

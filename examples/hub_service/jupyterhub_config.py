@@ -1,5 +1,4 @@
 import requests
-
 from oauthenticator.generic import GenericOAuthenticator
 
 c = get_config()  # noqa

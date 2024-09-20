@@ -1,9 +1,11 @@
 import os
 import subprocess
-import requests
+
 import pytest
-from conftest import wait_for_server, SandboxConfig
-from jupyter_smart_on_fhir.server_extension import smart_path, login_path, callback_path
+import requests
+from conftest import SandboxConfig, wait_for_server
+
+from jupyter_smart_on_fhir.server_extension import callback_path, login_path, smart_path
 
 PORT = os.getenv("TEST_PORT", 18888)
 ext_url = f"http://localhost:{PORT}"
@@ -35,8 +37,8 @@ def jupyter_server(tmpdir, jupyterdir):
     command = [
         "jupyter-server",
         "--ServerApp.token=secret",
-        "--SMARTExtensionApp.client_id={}".format(client_id),
-        "--port={}".format(PORT),
+        f"--SMARTExtensionApp.client_id={client_id}",
+        f"--port={PORT}",
     ]
     subprocess.check_call(
         extension_command + ["enable", "jupyter_smart_on_fhir.server_extension"],

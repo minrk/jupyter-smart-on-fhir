@@ -1,13 +1,15 @@
-from jupyter_server.extension.application import ExtensionApp
-from jupyter_server.base.handlers import JupyterHandler
-import tornado
-import requests
+import base64
+import hashlib
 import secrets
 from urllib.parse import urlencode, urljoin
-import hashlib
-import base64
-from jupyter_smart_on_fhir.auth import SMARTConfig, generate_state
+
+import requests
+import tornado
+from jupyter_server.base.handlers import JupyterHandler
+from jupyter_server.extension.application import ExtensionApp
 from traitlets import List, Unicode
+
+from jupyter_smart_on_fhir.auth import SMARTConfig, generate_state
 
 smart_path = "/smart"
 login_path = "/smart/login"

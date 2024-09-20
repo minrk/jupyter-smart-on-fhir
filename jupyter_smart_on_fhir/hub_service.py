@@ -4,25 +4,27 @@ SMART service authentication for a FHIR endpoint with the Hub
 - Asymmetric authentication
 """
 
+import base64
 import os
-import time
 import secrets
+import time
 from functools import wraps
+from urllib.parse import urlencode
+
+import jwt
+import requests
+from cryptography.fernet import Fernet, InvalidToken
 from flask import (
     Flask,
     Response,
+    current_app,
     make_response,
     redirect,
     request,
     session,
-    current_app,
 )
-import requests
-from urllib.parse import urlencode
-import jwt
-import base64
+
 from jupyter_smart_on_fhir.auth import SMARTConfig, generate_state, validate_keys
-from cryptography.fernet import Fernet, InvalidToken
 
 prefix = os.environ.get("JUPYTERHUB_SERVICE_PREFIX", "/")
 
