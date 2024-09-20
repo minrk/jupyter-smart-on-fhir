@@ -1,12 +1,13 @@
-import pytest
-import os
-import subprocess
-import requests
-import time
-from dataclasses import asdict, field, dataclass
 import base64
 import json
+import os
+import subprocess
+import time
+from dataclasses import asdict, dataclass, field
 from urllib import parse
+
+import pytest
+import requests
 
 
 @pytest.fixture(scope="function")  # module?

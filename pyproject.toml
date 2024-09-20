@@ -6,13 +6,13 @@ build-backend = "setuptools.build_meta"
 name = "jupyter_smart_on_fhir"
 version = "0.1.0"
 dependencies = [
-    "flask",
-    "tornado",
-    "pyJWT",
-    "requests",
-    "jupyter_server",
-    "jupyterhub",
-    "oauthenticator",
+  "flask",
+  "tornado",
+  "pyJWT",
+  "requests",
+  "jupyter_server",
+  "jupyterhub",
+  "oauthenticator",
 ]
 
 [project.optional-dependencies]
@@ -21,3 +21,14 @@ testing = ["pytest"]
 
 [tool.setuptools]
 packages = ["jupyter_smart_on_fhir"]
+
+[tool.ruff.lint]
+ignore = [
+  "F841", # unused variable
+]
+select = [
+  "E9", # syntax
+  "I",  # isort
+  "UP", # pyupgrade
+  "F",  # flake8
+]

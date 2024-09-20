@@ -1,19 +1,20 @@
+import os
+from urllib import parse
+
 import pytest
+import requests
+from conftest import SandboxConfig
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from flask import session
+
 from jupyter_smart_on_fhir.auth import get_jwks_from_key
 from jupyter_smart_on_fhir.hub_service import (
     create_app,
-    set_encrypted_cookie,
     get_encrypted_cookie,
     prefix,
-    token_for_code,
+    set_encrypted_cookie,
 )
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
-import os
-import requests
-from conftest import SandboxConfig
-from urllib import parse
 
 
 @pytest.fixture(scope="module")
