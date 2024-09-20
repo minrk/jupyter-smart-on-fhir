@@ -21,3 +21,14 @@ testing = ["pytest"]
 
 [tool.setuptools]
 packages = ["jupyter_smart_on_fhir"]
+
+[tool.ruff.lint]
+ignore = [
+  "F841", # unused variable
+]
+select = [
+  "E9", # syntax
+  "I",  # isort
+  "UP", # pyupgrade
+  "F",  # flake8
+]
