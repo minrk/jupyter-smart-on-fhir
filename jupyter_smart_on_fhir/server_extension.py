@@ -63,6 +63,7 @@ class SMARTAuthHandler(JupyterHandler):
         self.settings["smart_config"] = smart_config
         token = self.settings.get("smart_token")
         if not token:
+            # TODO: persist next_url differently
             self.settings["next_url"] = self.request.uri
             self.redirect(login_path)
         else:
@@ -147,9 +148,10 @@ class SMARTCallbackHandler(JupyterHandler):
             raise tornado.web.HTTPError(
                 400, "Error: no code in response from FHIR server"
             )
-        state_id = self.get_signed_cookie("state_id", b"").decode("utf-8")
-        if not state_id:
+        state_id = self.get_signed_cookie("state_id")
+        if state_id is None:
             raise tornado.web.HTTPError(400, "Error: missing state cookie")
+        state_id = state_id.decode("utf-8")
         arg_state = self.get_argument("state")
         if not arg_state:
             raise tornado.web.HTTPError(400, "Error: missing state argument")
@@ -158,7 +160,7 @@ class SMARTCallbackHandler(JupyterHandler):
                 400, "Error: state received from FHIR server does not match"
             )
         self.settings["smart_token"] = await self.token_for_code(code)
-        next_url = self.settings["next_url"]
+        # TODO: persist next_url differently
         self.redirect(self.settings["next_url"])
 
 
