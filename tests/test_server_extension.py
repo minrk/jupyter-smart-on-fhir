@@ -57,7 +57,7 @@ async def test_login_handler(
         )
     response = exc_info.value.response
     assert response.code == 302
-    assert response.headers["Location"] == login_path
+    assert response.headers["Location"] == url_path_join(jp_base_url, login_path)
 
     # Login with headers and get redirected to auth url
     with pytest.raises(HTTPClientError) as exc_info:

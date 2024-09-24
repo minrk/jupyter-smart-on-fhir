@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import json
+import os
 import secrets
 from urllib.parse import urlencode, urljoin
 
@@ -8,7 +9,8 @@ import tornado
 from jupyter_server.base.handlers import JupyterHandler
 from jupyter_server.extension.application import ExtensionApp
 from jupyter_server.utils import url_path_join
-from tornado.httpclient import AsyncHTTPClient
+from tornado import web
+from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 from traitlets import List, Unicode
 
 from jupyter_smart_on_fhir.auth import SMARTConfig, generate_state
@@ -35,12 +37,32 @@ class SMARTExtensionApp(ExtensionApp):
     ).tag(config=True)
 
     client_id = Unicode(
-        help="""Client ID for the SMART application""", default_value="test_id"
+        help="""Client ID for the SMART application""",
+    ).tag(config=True)
+
+    redirect_uri = Unicode(
+        help="""Redirect URI for the SMART application
+
+        If unspecified, will deduce from the current request
+        """,
+    ).tag(config=True)
+
+    default_issuer = Unicode(
+        help="""default issuer for launch page, if none specified
+        """,
+    ).tag(config=True)
+
+    default_launch_url = Unicode(
+        help="""default launch url for launch page. Must match host for issuer.
+        """,
     ).tag(config=True)
 
     def initialize_settings(self):
         self.settings["scopes"] = self.scopes
         self.settings["client_id"] = self.client_id
+        self.settings["smart_redirect_uri"] = self.redirect_uri
+        self.settings["smart_default_issuer"] = self.default_issuer
+        self.settings["smart_default_launch_url"] = self.default_launch_url
 
     def initialize_handlers(self):
         self.handlers.extend(
@@ -57,31 +79,24 @@ class SMARTAuthHandler(JupyterHandler):
 
     @tornado.web.authenticated
     async def get(self):
-        fhir_url = self.get_argument("iss")
+        fhir_url = self.get_argument("iss", self.settings["smart_default_issuer"])
+        if not fhir_url:
+            raise web.HTTPError(400, "issuer (?iss=...) required")
         smart_config = SMARTConfig.from_url(fhir_url, self.request.full_url())
-        self.settings["launch"] = self.get_argument("launch")
+        self.settings["launch"] = launch_url = self.get_argument("launch", None)
+
         self.settings["smart_config"] = smart_config
         token = self.settings.get("smart_token")
         if not token:
             # TODO: persist next_url differently
             self.settings["next_url"] = self.request.uri
-            self.redirect(login_path)
+            self.redirect(url_path_join(self.base_url, login_path))
         else:
-            data = await self.get_data(token)
-            self.write(f"Authorization success: Fetched {str(data)}")
-            self.finish()
-
-    async def get_data(self, token: str) -> dict:
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/fhir+json",
-            "User-Agent": "Jupyter",
-        }
-        url = (
-            f"{self.settings['smart_config'].fhir_url}/Condition"  # Endpoint with data
-        )
-        resp = await AsyncHTTPClient().fetch(url, headers=headers)
-        return json.loads(resp.body.decode("utf8", "replace"))
+            # persist it for future notebook launches
+            # TODO: put this in a file somewhere?
+            os.environ["SMART_TOKEN"] = token
+            self.set_header("Content-Type", "text/plain")
+            self.write("Authorization success: Token persisted in $SMART_TOKEN")
 
 
 class SMARTLoginHandler(JupyterHandler):
@@ -105,7 +120,8 @@ class SMARTLoginHandler(JupyterHandler):
             "aud": smart_config.fhir_url,
             "state": state["state_id"],
             "launch": self.settings["launch"],
-            "redirect_uri": urljoin(
+            "redirect_uri": self.settings["smart_redirect_uri"]
+            or urljoin(
                 self.request.full_url(), url_path_join(self.base_url, callback_path)
             ),
             "client_id": self.settings["client_id"],
@@ -126,17 +142,24 @@ class SMARTCallbackHandler(JupyterHandler):
             grant_type="authorization_code",
             code=code,
             code_verifier=self.get_signed_cookie("code_verifier").decode("ascii"),
-            redirect_uri=urljoin(
+            redirect_uri=self.settings["smart_redirect_uri"]
+            or urljoin(
                 self.request.full_url(), url_path_join(self.base_url, callback_path)
             ),
         )
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        token_reply = await AsyncHTTPClient().fetch(
-            self.settings["smart_config"].token_url,
-            body=urlencode(data),
-            headers=headers,
-            method="POST",
-        )
+        try:
+            token_reply = await AsyncHTTPClient().fetch(
+                self.settings["smart_config"].token_url,
+                body=urlencode(data),
+                headers=headers,
+                method="POST",
+            )
+        except HTTPClientError as e:
+            self.log.error(
+                "Error fetching token: %s", e.response.body.decode("utf8", "replace")
+            )
+            raise
         return json.loads(token_reply.body.decode("utf8", "replace"))["access_token"]
 
     @tornado.web.authenticated
