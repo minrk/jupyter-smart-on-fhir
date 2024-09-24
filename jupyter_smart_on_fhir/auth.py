@@ -17,7 +17,7 @@ class SMARTConfig:
     token_url: str
     auth_url: str
     scopes: list[str]
-    broadcast_path: str = ".well-known/smart-configuration"
+    broadcast_path: str = ".well-known/openid-configuration"
 
     @classmethod
     def from_url(cls, iss: str, base_url: str, **kwargs) -> "SMARTConfig":
