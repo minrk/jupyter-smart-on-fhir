@@ -58,8 +58,9 @@ class SMARTExtensionApp(ExtensionApp):
     ).tag(config=True)
 
     def initialize_settings(self):
-        self.settings["scopes"] = self.scopes
-        self.settings["client_id"] = self.client_id
+        self.settings["smart_auth"] = self
+        self.settings["smart_scopes"] = self.scopes
+        self.settings["smart_client_id"] = self.client_id
         self.settings["smart_redirect_uri"] = self.redirect_uri
         self.settings["smart_default_issuer"] = self.default_issuer
         self.settings["smart_default_launch_url"] = self.default_launch_url
@@ -109,7 +110,7 @@ class SMARTLoginHandler(JupyterHandler):
         if state["next_url"]:
             self.set_secure_cookie("next_url", state["next_url"])
 
-        scopes = self.settings["scopes"]
+        scopes = self.settings["smart_scopes"]
         smart_config = self.settings["smart_config"]
         auth_url = smart_config.auth_url
         code_verifier = secrets.token_urlsafe(53)
@@ -124,7 +125,7 @@ class SMARTLoginHandler(JupyterHandler):
             or urljoin(
                 self.request.full_url(), url_path_join(self.base_url, callback_path)
             ),
-            "client_id": self.settings["client_id"],
+            "client_id": self.settings["smart_client_id"],
             "code_challenge": code_challenge,
             "code_challenge_method": "S256",
             "response_type": "code",
@@ -138,7 +139,7 @@ class SMARTCallbackHandler(JupyterHandler):
 
     async def token_for_code(self, code: str) -> str:
         data = dict(
-            client_id=self.settings["client_id"],
+            client_id=self.settings["smart_client_id"],
             grant_type="authorization_code",
             code=code,
             code_verifier=self.get_signed_cookie("code_verifier").decode("ascii"),
