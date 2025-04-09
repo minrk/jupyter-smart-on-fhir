@@ -33,3 +33,7 @@ oldest-requirements.txt
 jupyterhub-proxy.pid
 
 *.hot-update*
+
+# pixi environments
+.pixi
+*.egg-info

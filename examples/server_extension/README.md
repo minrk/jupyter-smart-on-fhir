@@ -32,8 +32,8 @@ _work in progress_
 1. Clone the repository:
 
    ```
-   git clone https://github.com/jupyterhealth/smart-fhir-jupyter-demo.git
-   cd smart-fhir-jupyter-demo/server_extension
+   git clone https://github.com/jupyterhealth/jupyter-smart-on-fhir.git
+   cd jupyter-smart-on-fhir/server_extension
    ```
 
 2. Build the Docker image:
@@ -47,19 +47,13 @@ _work in progress_
 
 1. Ensure you're in the project directory and your virtual environment is activated.
 
-2. Enable the server extension:
-
-   ```
-   jupyter server extension enable jupyter_smart_on_fhir.server_extension
-   ```
-
-3. Start the Jupyter server:
+2. Start the Jupyter server:
 
    ```
    jupyter server
    ```
 
-4. Open a web browser and navigate to `http://localhost:8888` to access the Jupyter interface.
+3. Open a web browser and navigate to `http://localhost:8888` to access the Jupyter interface.
 
 ## Running with Docker
 
@@ -73,7 +67,7 @@ _work in progress_
 
 # Testing with a SMART app
 
-1. Use the sandbox (either [locally](https://github.com/smart-on-fhir/smart-launcher-v2/) or [online](https://launch.smarthealthit.org/)) and point it towards
+1. Use the sandbox (either [locally](https://github.com/smart-on-fhir/smart-launcher-v2/) or [online](http://launch.smarthealthit.org/)) and point it towards
    ```
-   http://localhost:8888/extension/fhir
+   http://localhost:8888/smart-on-fhir/launch
    ```

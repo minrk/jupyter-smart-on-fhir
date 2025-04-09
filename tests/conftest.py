@@ -81,7 +81,7 @@ class SandboxConfig:
             elif isinstance(val, set):
                 attr_list.append(" ".join(val))
         attr_repr = json.dumps(attr_list)
-        return base64.b64encode(attr_repr.encode("utf-8"))
+        return base64.b64encode(attr_repr.encode("utf-8")).decode("ascii")
 
     def get_url_query(
         self, launch_url: str, validation: bool = True, fhir_version: str = "r4"
