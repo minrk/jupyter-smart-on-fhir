@@ -1,4 +1,4 @@
-# Configuration file for jupyter-server.
+# Configuration file for jupyter-server
 
 c = get_config()  # noqa
 

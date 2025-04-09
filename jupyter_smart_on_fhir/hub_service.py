@@ -154,8 +154,8 @@ def authenticated(f):
             session["smart_config"] = SMARTConfig.from_url(
                 request.args["iss"],
                 request.base_url,
-                scopes=os.environ.get("SCOPES", "").split(),
             ).to_dict()
+            session["scopes"] = os.environ.get("SCOPES", "").split()
             state = generate_state(next_url=request.path)
             for key in ("next_url", "state_id"):
                 set_encrypted_cookie(key, state[key])
@@ -168,7 +168,7 @@ def start_oauth_flow(state_id: str, scopes: list[str] | None = None) -> Response
     """Start the OAuth flow by redirecting to the authorization endpoint"""
     config = SMARTConfig(**session.get("smart_config"))
     redirect_uri = config.base_url + "oauth_callback"
-    scopes = scopes or config.scopes
+    scopes = session.get("scopes")
     headers = {
         "aud": config.fhir_url,
         "state": state_id,

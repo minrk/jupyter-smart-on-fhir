@@ -1,8 +1,12 @@
+import base64
+import hashlib
 import json
 import os
 import secrets
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any
 
 import jwt
 import requests
@@ -16,8 +20,8 @@ class SMARTConfig:
     fhir_url: str
     token_url: str
     auth_url: str
-    scopes: list[str]
-    broadcast_path: str = ".well-known/openid-configuration"
+    smart_config: dict[str, Any]
+    broadcast_path: str = ".well-known/smart-configuration"
 
     @classmethod
     def from_url(cls, iss: str, base_url: str, **kwargs) -> "SMARTConfig":
@@ -28,7 +32,7 @@ class SMARTConfig:
             fhir_url=iss,
             token_url=app_config["token_endpoint"],
             auth_url=app_config["authorization_endpoint"],
-            scopes=scopes,
+            smart_config=app_config,
         )
 
     def to_dict(self):
@@ -37,11 +41,17 @@ class SMARTConfig:
 
 def generate_state(next_url=None) -> dict:
     """Generate a state cookie for OAuth flow"""
+    code_verifier = secrets.token_urlsafe(53)
+    code_challenge_b = hashlib.sha256(code_verifier.encode("utf-8")).digest()
+    code_challenge = base64.urlsafe_b64encode(code_challenge_b).rstrip(b"=")
     return {
         "state_id": secrets.token_urlsafe(16),
         "next_url": next_url,
         "httponly": True,
         "max_age": 600,
+        "timestamp": time.time(),
+        "code_verifier": code_verifier,
+        "code_challenge": code_challenge,
     }
 
 

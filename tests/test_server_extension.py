@@ -1,4 +1,5 @@
 import json
+import os
 from http.cookies import SimpleCookie
 from urllib.parse import parse_qsl, urlparse, urlunparse
 
@@ -8,7 +9,11 @@ from jupyter_server.utils import url_path_join
 from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 from traitlets.config import Config
 
-from jupyter_smart_on_fhir.server_extension import callback_path, login_path, smart_path
+from jupyter_smart_on_fhir.server_extension import (
+    callback_path,
+    launch_path,
+    login_path,
+)
 
 
 @pytest.fixture
@@ -27,7 +32,7 @@ def jp_server_config(client_id):
 
 async def test_uninformed_endpoint(jp_fetch):
     with pytest.raises(HTTPClientError) as e:
-        await jp_fetch(smart_path)
+        await jp_fetch(launch_path)
     assert e.value.code == 400
 
 
@@ -48,20 +53,33 @@ async def test_login_handler(
 ):
     """I think this test can be split in three with some engineering. Perhaps useful, not sure"""
     # Try endpoint and get redirected to login
-    query = {"iss": f"{sandbox}/v/r4/fhir", "launch": public_client.get_launch_code()}
+    next_path = url_path_join(jp_base_url, "test-next")
+    query = {
+        "iss": f"{sandbox}/v/r4/fhir",
+        "launch": public_client.get_launch_code(),
+        "next": next_path,
+    }
     with pytest.raises(HTTPClientError) as exc_info:
         response = await jp_fetch(
-            smart_path,
+            launch_path,
             params=query,
             follow_redirects=False,
         )
     response = exc_info.value.response
     assert response.code == 302
-    assert response.headers["Location"] == url_path_join(jp_base_url, login_path)
+    redirect_url = response.headers["Location"]
+    redirect = urlparse(redirect_url)
+    assert redirect.path == url_path_join(jp_base_url, login_path)
+    login_query = dict(parse_qsl(redirect.query))
+
+    assert login_query["launch"] == query["launch"]
+    assert "scope" in login_query
 
     # Login with headers and get redirected to auth url
     with pytest.raises(HTTPClientError) as exc_info:
-        response = await jp_fetch(login_path, follow_redirects=False)
+        response = await jp_fetch(
+            login_path, params=login_query, follow_redirects=False
+        )
     response = exc_info.value.response
     assert response.code == 302
     auth_url = response.headers["Location"]
@@ -101,12 +119,9 @@ async def test_login_handler(
     assert response.code == 302
     dest_url = response.headers["Location"]
 
-    # TODO: test dest_url?
-    assert urlparse(dest_url).path.startswith(url_path_join(jp_base_url, smart_path))
-
-    # verify that token was issued and works
-    assert "smart_token" in jp_serverapp.web_app.settings
-    token = jp_serverapp.web_app.settings["smart_token"]
+    assert urlparse(dest_url).path == next_path
+    assert "SMART_TOKEN" in os.environ
+    token = os.environ["SMART_TOKEN"]
     smart_config = jp_serverapp.web_app.settings["smart_config"]
     url = url_path_join(smart_config.fhir_url, "Condition")
     resp = await http_client.fetch(url, headers={"Authorization": f"Bearer {token}"})
