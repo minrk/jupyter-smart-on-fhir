@@ -1,3 +1,6 @@
+__version__ = "0.1.0.dev"
+
+
 def _jupyter_server_extension_points():
     from .server_extension import SMARTExtensionApp
 

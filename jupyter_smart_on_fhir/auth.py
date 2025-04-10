@@ -26,7 +26,6 @@ class SMARTConfig:
     @classmethod
     def from_url(cls, iss: str, base_url: str, **kwargs) -> "SMARTConfig":
         app_config = requests.get(f"{iss}/{cls.broadcast_path}").json()
-        scopes = kwargs.pop("scopes", [])
         return cls(
             base_url=base_url,
             fhir_url=iss,
