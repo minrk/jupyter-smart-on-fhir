@@ -121,13 +121,23 @@ class SMARTExtensionApp(ExtensionApp):
 def get_next_url(handler):
     """Get next url and validate it"""
     next_url = handler.get_argument("next", None)
+    if ":" in next_url:
+        handler.log.warning(f"Not allowing absolute next URL: {next_url}")
+        next_url = None
     if next_url:
-        next_url = next_url.replace("\\", "/")
+        # ensure single leading '/', avoid backslash shenanigans
+        next_url = "/" + next_url.replace("\\", "%5C").lstrip("/")
+        parsed_next_url = urlparse(next_url)
         # make it an absolute path, strip host info
-        next_url = "/" + urlparse(next_url).path.strip("/")
+        next_url = "/" + parsed_next_url.path.lstrip("/")
         # and relative to self.base_url
         if not (next_url + "/").startswith(handler.base_url):
             next_url = url_path_join(handler.base_url, next_url)
+        # restore query, fragment
+        if parsed_next_url.query:
+            next_url = next_url + "?" + parsed_next_url.query
+        if parsed_next_url.fragment:
+            next_url = next_url + "#" + parsed_next_url.fragment
     else:
         next_url = handler.base_url
     return next_url
