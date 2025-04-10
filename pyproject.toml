@@ -10,7 +10,7 @@ dynamic = ["readme"]
 keywords = ["Jupyter", "JupyterHub", "SMART", "FHIR"]
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
-dependencies = ["pyjwt", "requests", "jupyterhub"]
+dependencies = ["pyjwt", "requests"]
 classifiers = [
   "Development Status :: 1 - Planning",
   "Intended Audience :: Developers",
@@ -28,7 +28,7 @@ test = [
   "pytest-jupyter[server]",
   "jupyter-smart-on-fhir[hubservice,serverextension]",
 ]
-hubservice = ["flask"]
+hubservice = ["flask", "jupyterhub"]
 serverextension = ["jupyter-server", "tornado"]
 
 [project.urls]
