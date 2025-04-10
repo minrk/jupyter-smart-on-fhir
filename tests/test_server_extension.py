@@ -53,7 +53,7 @@ async def test_login_handler(
 ):
     """I think this test can be split in three with some engineering. Perhaps useful, not sure"""
     # Try endpoint and get redirected to login
-    next_path = url_path_join(jp_base_url, "test-next")
+    next_path = url_path_join("/test-next?a=b&c=d")
     query = {
         "iss": f"{sandbox}/v/r4/fhir",
         "launch": public_client.get_launch_code(),
@@ -119,7 +119,7 @@ async def test_login_handler(
     assert response.code == 302
     dest_url = response.headers["Location"]
 
-    assert urlparse(dest_url).path == next_path
+    assert dest_url == url_path_join(jp_base_url, next_path)
     assert "SMART_TOKEN" in os.environ
     token = os.environ["SMART_TOKEN"]
     smart_config = jp_serverapp.web_app.settings["smart_config"]
