@@ -1,4 +1,4 @@
-name: JupyterHealth SMART on FHIR test suite
+name: test
 
 on:
   push:
