@@ -1,0 +1,7 @@
+{
+  "ServerApp": {
+    "jpserver_extensions": {
+      "jupyter_smart_on_fhir": true
+    }
+  }
+}
