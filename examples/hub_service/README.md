@@ -33,7 +33,6 @@ This project contains a demo of a JupyterHub service that acts as a confidential
 ## Configuration
 
 1. Update the `jupyterhub_config.py` file with your SMART on FHIR server details:
-
    - Set the `fhir_base_url` to the sandbox server's URL
 
 2. As a confidential client, this needs a public/private key pair. For demo purposes, the script takes care of generating this keypair.
