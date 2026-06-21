@@ -121,7 +121,7 @@ class SMARTExtensionApp(ExtensionApp):
 def get_next_url(handler):
     """Get next url and validate it"""
     next_url = handler.get_argument("next", None)
-    if ":" in next_url:
+    if next_url and ":" in next_url:
         handler.log.warning(f"Not allowing absolute next URL: {next_url}")
         next_url = None
     if next_url:
