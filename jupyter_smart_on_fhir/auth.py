@@ -25,7 +25,11 @@ class SMARTConfig:
 
     @classmethod
     def from_url(cls, iss: str, base_url: str, **kwargs) -> "SMARTConfig":
-        app_config = requests.get(f"{iss}/{cls.broadcast_path}").json()
+        # strip any trailing slash on iss so we don't build a double-slash URL: some
+        # FHIR servers (e.g. MedPlum sends iss with a trailing slash) treat
+        # `/fhir/R4//.well-known/smart-configuration` as a resource path and return an
+        # auth-required OperationOutcome instead of the SMART config.
+        app_config = requests.get(f"{iss.rstrip('/')}/{cls.broadcast_path}").json()
         return cls(
             base_url=base_url,
             fhir_url=iss,
